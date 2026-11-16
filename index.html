@@ -843,17 +843,16 @@
             else if(t==='backup') { renderTrash(); renderPin(); }
         };
 
-        /* 6) لوحة التحكم ومؤشرات المعلم (جدول الحصص الأسبوعي) */
+     /* 6) لوحة التحكم ومؤشرات المعلم (جدول الحصص الأسبوعي) */
         const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
         const PER = ['الحصة الأولى', 'الحصة الثانية', 'الحصة الثالثة', 'الحصة الرابعة', 'الحصة الخامسة', 'الحصة السادسة', 'الحصة السابعة'];
         let ttOpen = false;
 
-        // دالة حفظ الحصص (مخصصة لكل معلم بشكل مستقل)
+        // دالة حفظ الحصص (مخصصة لكل مستخدم بشكل مستقل)
         window.ttSet = (d, pi, cid) => {
-            if(isAdmin) return mzAlert('عفواً، إعداد جدول الحصص يتم من خلال حساب المعلم مباشرة.');
             const tid = currentUser.id;
             
-            // مسح الحصة لنفس اليوم ونفس الوقت ونفس المعلم (لمنع التكرار)
+            // مسح الحصة لنفس اليوم ونفس الوقت لنفس الحساب (لمنع التكرار)
             db.timetable = db.timetable.filter(t => !(t.d === d && t.p === PER[pi] && t.teacherId === tid));
             
             // إضافة الحصة الجديدة
@@ -867,21 +866,15 @@
         window.openPeriod = (cid, pi) => { switchTab('attendance'); $('attendanceClassSelect').value=cid; $('lessonPeriodSelect').value=PER[pi]; $('attendanceDate').valueAsDate=new Date(); loadClassAttendance(); };
 
         function renderToday() {
-            // إخفاء الجدول لحساب الإدارة حيث أنه مخصص للمعلمين
-            if(isAdmin) {
-                $('todayBox').innerHTML = '';
-                return;
-            }
-
             const d = new Date().getDay(); // 0 = الأحد، 1 = الاثنين...
             const visibleClasses = getVisibleClasses();
             const tid = currentUser.id;
 
-            // جلب حصص اليوم للمعلم الحالي فقط
+            // جلب حصص اليوم للحساب الحالي فقط
             const items = db.timetable.filter(t => t.d === d && t.teacherId === tid).sort((a,b)=>PER.indexOf(a.p)-PER.indexOf(b.p));
             const opts = sel => '<option value="">-</option>' + visibleClasses.map(c => `<option value="${c.id}" ${c.id===sel?'selected':''}>${esc(c.name)}</option>`).join('');
 
-            // بناء جدول الحصص الأسبوعي المطابق للصورة المرفقة
+            // بناء جدول الحصص الأسبوعي المطابق للتصميم
             let tbody = '';
             for(let pi = 0; pi < PER.length; pi++) {
                 let tr = `<tr class="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"><td class="p-2 font-bold text-center border dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 w-12">${pi + 1}</td>`;
@@ -923,35 +916,6 @@
                 ${editor}
             </div>`;
         }
-
-        const DAY = 864e5, BK = 'mz_last_backup';
-        window.exportBackupJSON = function() { localStorage.setItem(BK, Date.now()); const d="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(db)), a=document.createElement('a'); a.href=d; a.download="muwazib_backup.json"; a.click(); renderExtras(); };
-        window.importBackupJSON = e => { const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=async e=>{try{db=JSON.parse(e.target.result);saveDB();renderClassesList();applySettings();updateDashboardStats();await mzAlert('تم الاسترجاع!');}catch(err){await mzAlert('ملف خاطئ');}}; r.readAsText(f); };
-
-        function renderExtras() {
-            const last = +localStorage.getItem(BK)||0, hasData = db.classes.some(c=>c.students.length);
-            $('backupBanner').innerHTML = (hasData && Date.now()-last > 7*DAY) ? `<div class="bg-amber-50 border-amber-300 text-amber-800 p-4 rounded-2xl text-sm flex justify-between mb-6"><span><i class="fa-solid fa-triangle-exclamation"></i> نسخة احتياطية قديمة.</span><button onclick="exportBackupJSON()" class="bg-amber-600 text-white px-3 py-1 rounded-xl">تصدير الآن</button></div>`:'';
-            const th = +localStorage.getItem('mz_abs_th')||3, out=[];
-            getVisibleClasses().forEach(c => {
-                const recs = db.attendance.filter(a=>a.classId===c.id), dates = [...new Set(recs.map(a=>a.date))].sort();
-                if(!dates.length) return;
-                c.students.forEach(s => {
-                    const abs = new Set(); recs.forEach(a=>a.records.forEach(r=>{if(r.studentId===s.id && r.status==='غائب')abs.add(a.date);}));
-                    if(!abs.size) return;
-                    let run=0, best=0; dates.forEach(d=>{run=abs.has(d)?run+1:0;best=Math.max(best,run);});
-                    if(best>=th) out.push({s,c,why:`${best} متتالية`}); else if(dates.length>=5 && abs.size/dates.length>=0.1) out.push({s,c,why:`غاب ${Math.round(abs.size/dates.length*100)}%`});
-                });
-            });
-            $('riskBox').innerHTML = `<div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border dark:border-gray-700 mb-6"><div class="flex justify-between items-center mb-3"><h2 class="font-bold text-rose-600">تنبيه الغياب (${out.length})</h2><label class="text-xs">تنبيه بعد <input type="number" min="1" value="${th}" onchange="localStorage.setItem('mz_abs_th',this.value);renderExtras()" class="w-10 text-center border rounded bg-transparent"> أيام</label></div><div class="grid grid-cols-2 md:grid-cols-3 gap-2">${out.slice(0,12).map(r=>`<div onclick="openStudentProfile('${r.s.id}')" class="p-2 bg-rose-50 border border-rose-200 rounded-lg cursor-pointer"><div class="font-bold text-sm">${esc(r.s.name)}</div><div class="text-xs text-rose-700">${esc(r.c.name)} | ${r.why}</div></div>`).join('')||'<p class="text-xs">لا حالات.</p>'}</div></div>`;
-        }
-
-        window.updateDashboardStats = function() {
-            $('dashTotalClasses').innerText = db.classes.length;
-            $('dashTotalStudents').innerText = db.classes.reduce((sum,c)=>sum+c.students.length, 0);
-            $('dashTotalRecords').innerText = db.attendance.length;
-            $('dashTotalAbsences').innerText = db.attendance.reduce((sum,a)=>sum+a.records.filter(r=>r.status==='غائب').length, 0);
-            renderToday(); renderExtras();
-        };
 
         /* 7) الفصول والطلاب والمحذوفات */
         const preClasses = ["10-1", "10-2", "10-3", "10-4", "10-5", "10-6", "10-7", "10-8", "10-9", "10-10", "11د1", "11د2", "11ع1", "11ع2", "11ع3", "11ع4", "11ع5", "11ع6", "11ع7", "11ع8", "12د1", "12د2", "12ع1", "12ع2", "12ع3", "12ع4", "12ع5", "12ع6", "12ع7", "12ع8"];
