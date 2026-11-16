@@ -50,6 +50,7 @@
         /* تأثيرات صلاحيات المستخدمين وتسجيل الدخول */
         body.teacher-mode .admin-only { display: none !important; }
         #loginOverlay { z-index: 9999; }
+        #changePasswordModal { z-index: 10000 !important; }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen flex flex-col transition-colors duration-200 pb-24">
@@ -217,7 +218,7 @@
                 <h2 class="text-lg font-bold mb-4 flex items-center gap-2">قائمة المعلمين</h2>
                 <div class="overflow-x-auto">
                     <table class="w-full text-right text-sm border-collapse">
-                        <thead><tr class="bg-gray-100 dark:bg-gray-700"><th class="p-3">الكود</th><th class="p-3">الاسم</th><th class="p-3">المادة</th><th class="p-3">الرقم السري</th><th class="p-3 text-center">إجراءات</th></tr></thead>
+                        <thead><tr class="bg-gray-100 dark:bg-gray-700"><th class="p-3">الكود</th><th class="p-3">الاسم</th><th class="p-3">المادة</th><th class="p-3">الرقم السري</th><th class="p-3 text-center">الصلاحية</th><th class="p-3 text-center">إجراءات</th></tr></thead>
                         <tbody id="teachersTableBody" class="divide-y divide-gray-100 dark:divide-gray-700"></tbody>
                     </table>
                 </div>
@@ -244,7 +245,7 @@
                             <option value="الحصة الأولى">الحصة الأولى (07:55)</option>
                             <option value="الحصة الثانية">الحصة الثانية (08:42)</option>
                             <option value="الحصة الثالثة">الحصة الثالثة (09:29)</option>
-                            <option value="الحصة الرابعة">الحصة الرابعة (10:36)</option>
+                            <option value="الحصة الرابعة">الحصة الرابع (10:36)</option>
                             <option value="الحصة الخامسة">الحصة الخامسة (11:23)</option>
                             <option value="الحصة السادسة">الحصة السادسة (12:30)</option>
                             <option value="الحصة السابعة">الحصة السابعة (01:15)</option>
@@ -672,18 +673,22 @@
         let isAdmin = false;
 
         /* نظام المصادقة والصلاحيات Auth */
+        const toEnNum = str => String(str).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+
         function performLogin() {
-            const u = $('loginUsername').value.trim();
-            const p = $('loginPassword').value.trim();
+            const u = toEnNum($('loginUsername').value.trim());
+            const p = toEnNum($('loginPassword').value.trim());
+            
             if(u === 'Elustaz' && p === '1983') {
                 currentUser = { id: 'admin', role: 'admin', name: 'الإدارة' };
                 isAdmin = true;
                 finishLogin();
             } else {
-                const t = db.teachers.find(x => x.code === u && x.password === p);
+                const t = db.teachers.find(x => x && String(x.code).trim() === u && String(x.password).trim() === p);
                 if(t) {
                     currentUser = t;
-                    isAdmin = false;
+                    isAdmin = (t.role === 'admin'); 
+                    
                     if(p === '1234') {
                         $('changePasswordModal').classList.remove('hidden');
                         return;
@@ -1240,11 +1245,44 @@
                 if(t) { t.password = '1234'; saveDB(); renderTeachersList(); await mzAlert('تم إعادة التعيين'); }
             }
         });
+
+        /* دالة التبديل بين صلاحية المعلم والإدارة */
+        window.toggleTeacherRole = withSnap(async (id) => {
+            const t = db.teachers.find(t => t.id === id);
+            if(t) {
+                const isCurrentlyAdmin = t.role === 'admin';
+                const msg = isCurrentlyAdmin ? 'سحب صلاحيات الإدارة من هذا المعلم وجعله معلماً عادياً؟' : 'ترقية هذا المعلم لمنحه صلاحيات الإدارة الكاملة؟';
+                
+                if(await mzConfirm(msg)) {
+                    t.role = isCurrentlyAdmin ? 'teacher' : 'admin';
+                    saveDB();
+                    renderTeachersList();
+                }
+            }
+        });
+
+        /* تحديث رسم جدول المعلمين ليظهر الصلاحية وزر التبديل */
         function renderTeachersList() {
             const tb = $('teachersTableBody'); if(!tb) return;
-            tb.innerHTML = db.teachers.map(t => `<tr><td class="p-3 font-bold">${t.code}</td><td class="p-3">${t.name}</td><td class="p-3">${t.subject}</td><td class="p-3 text-gray-400 text-xs">${t.password === '1234' ? 'افتراضي (1234)' : 'مخصص'}</td><td class="p-3 text-center"><button onclick="resetGlobalTeacher('${t.id}')" class="text-amber-500 ml-2" title="إعادة تعيين الرقم السري"><i class="fa-solid fa-key"></i></button><button onclick="deleteGlobalTeacher('${t.id}')" class="text-rose-500" title="حذف المعلم"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
+            tb.innerHTML = db.teachers.map(t => {
+                const roleBadge = t.role === 'admin' 
+                    ? '<span class="bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-1 rounded text-xs font-bold">إدارة</span>' 
+                    : '<span class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded text-xs font-bold">معلم</span>';
+                    
+                return `<tr>
+                    <td class="p-3 font-bold">${t.code}</td>
+                    <td class="p-3">${t.name}</td>
+                    <td class="p-3">${t.subject}</td>
+                    <td class="p-3 text-gray-400 text-xs">${t.password === '1234' ? 'افتراضي' : 'مخصص'}</td>
+                    <td class="p-3 text-center">${roleBadge}</td>
+                    <td class="p-3 text-center">
+                        <button onclick="toggleTeacherRole('${t.id}')" class="text-indigo-500 ml-2" title="تغيير الصلاحية"><i class="fa-solid fa-user-shield"></i></button>
+                        <button onclick="resetGlobalTeacher('${t.id}')" class="text-amber-500 ml-2" title="إعادة تعيين الرقم السري"><i class="fa-solid fa-key"></i></button>
+                        <button onclick="deleteGlobalTeacher('${t.id}')" class="text-rose-500" title="حذف المعلم"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            }).join('');
         }
-
 
         /* 13) التهيئة السحابية عند بدء التطبيق */
         async function initCloudDB() {
