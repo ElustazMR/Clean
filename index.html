@@ -843,19 +843,85 @@
             else if(t==='backup') { renderTrash(); renderPin(); }
         };
 
-        /* 6) لوحة التحكم والمؤشرات الإضافية (جدول الحصص، التحذيرات) */
-        const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'], PER = ['الحصة الأولى', 'الحصة الثانية', 'الحصة الثالثة', 'الحصة الرابعة', 'الحصة الخامسة', 'الحصة السادسة', 'الحصة السابعة'];
+        /* 6) لوحة التحكم ومؤشرات المعلم (جدول الحصص الأسبوعي) */
+        const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+        const PER = ['الحصة الأولى', 'الحصة الثانية', 'الحصة الثالثة', 'الحصة الرابعة', 'الحصة الخامسة', 'الحصة السادسة', 'الحصة السابعة'];
         let ttOpen = false;
-        window.ttSet = (d, pi, cid) => { db.timetable = db.timetable.filter(t => !(t.d===d && t.p===PER[pi])); if(cid) db.timetable.push({ d, p:PER[pi], classId:cid }); saveDB(); };
+
+        // دالة حفظ الحصص (مخصصة لكل معلم بشكل مستقل)
+        window.ttSet = (d, pi, cid) => {
+            if(isAdmin) return mzAlert('عفواً، إعداد جدول الحصص يتم من خلال حساب المعلم مباشرة.');
+            const tid = currentUser.id;
+            
+            // مسح الحصة لنفس اليوم ونفس الوقت ونفس المعلم (لمنع التكرار)
+            db.timetable = db.timetable.filter(t => !(t.d === d && t.p === PER[pi] && t.teacherId === tid));
+            
+            // إضافة الحصة الجديدة
+            if (cid) {
+                db.timetable.push({ d, p: PER[pi], classId: cid, teacherId: tid });
+            }
+            saveDB();
+        };
+
         window.toggleTT = () => { ttOpen = !ttOpen; renderToday(); };
         window.openPeriod = (cid, pi) => { switchTab('attendance'); $('attendanceClassSelect').value=cid; $('lessonPeriodSelect').value=PER[pi]; $('attendanceDate').valueAsDate=new Date(); loadClassAttendance(); };
+
         function renderToday() {
-            const d = new Date().getDay();
+            // إخفاء الجدول لحساب الإدارة حيث أنه مخصص للمعلمين
+            if(isAdmin) {
+                $('todayBox').innerHTML = '';
+                return;
+            }
+
+            const d = new Date().getDay(); // 0 = الأحد، 1 = الاثنين...
             const visibleClasses = getVisibleClasses();
-            const items = db.timetable.filter(t => t.d===d && visibleClasses.some(c=>c.id===t.classId)).sort((a,b)=>PER.indexOf(a.p)-PER.indexOf(b.p));
+            const tid = currentUser.id;
+
+            // جلب حصص اليوم للمعلم الحالي فقط
+            const items = db.timetable.filter(t => t.d === d && t.teacherId === tid).sort((a,b)=>PER.indexOf(a.p)-PER.indexOf(b.p));
             const opts = sel => '<option value="">-</option>' + visibleClasses.map(c => `<option value="${c.id}" ${c.id===sel?'selected':''}>${esc(c.name)}</option>`).join('');
-            const editor = ttOpen ? `<div class="overflow-x-auto mt-3"><table class="w-full text-xs border-collapse"><thead><tr><th class="p-1"></th>${DAYS.map(x=>`<th class="p-1">${x}</th>`).join('')}</tr></thead><tbody>${PER.map((p,pi)=>`<tr><td class="p-1 font-bold">${pi+1}</td>${DAYS.map((_,di)=>`<td class="p-1"><select onchange="ttSet(${di},${pi},this.value)" class="w-full border dark:border-gray-600 rounded bg-transparent p-1">${opts((db.timetable.find(t=>t.d===di&&t.p===p)||{}).classId)}</select></td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'';
-            $('todayBox').innerHTML = `<div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border dark:border-gray-700 mb-6"><div class="flex justify-between items-center"><h2 class="font-bold"><i class="fa-solid fa-calendar-day text-blue-600 ml-1"></i> حصصك اليوم${d>4?' (عطلة)':''}</h2><button onclick="toggleTT()" class="text-xs text-blue-600 admin-only">${ttOpen?'إخفاء':'الجدول الأسبوعي'}</button></div><div class="flex gap-2 mt-3">${items.map(t=>{const c=visibleClasses.find(x=>x.id===t.classId);return `<button onclick="openPeriod('${c.id}',${PER.indexOf(t.p)})" class="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 px-4 py-2 rounded-xl text-sm font-bold">${PER.indexOf(t.p)+1} · ${esc(c.name)}</button>`}).join('')||'<span class="text-xs text-gray-400">لا حصص اليوم.</span>'}</div>${editor}</div>`;
+
+            // بناء جدول الحصص الأسبوعي المطابق للصورة المرفقة
+            let tbody = '';
+            for(let pi = 0; pi < PER.length; pi++) {
+                let tr = `<tr class="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"><td class="p-2 font-bold text-center border dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 w-12">${pi + 1}</td>`;
+                for(let di = 0; di < DAYS.length; di++) {
+                    const cellData = db.timetable.find(t => t.d === di && t.p === PER[pi] && t.teacherId === tid);
+                    const selCid = cellData ? cellData.classId : '';
+                    tr += `<td class="p-2 border dark:border-gray-700">
+                               <select onchange="ttSet(${di}, ${pi}, this.value)" class="w-full border border-gray-200 dark:border-gray-600 rounded-lg bg-transparent p-1.5 text-xs focus:ring-2 focus:ring-blue-500 outline-none transition text-gray-700 dark:text-gray-200 font-semibold cursor-pointer appearance-none" style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236b7280%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: left .7em top 50%; background-size: .65em auto;">
+                                   ${opts(selCid)}
+                               </select>
+                           </td>`;
+                }
+                tr += `</tr>`;
+                tbody += tr;
+            }
+
+            const editor = ttOpen ? `<div class="overflow-x-auto mt-6 pt-6 border-t dark:border-gray-700"><table class="w-full text-xs border-collapse"><thead><tr class="text-gray-600 dark:text-gray-300"><th class="p-3 border dark:border-gray-700 text-center">#</th>${DAYS.map(x=>`<th class="p-3 border dark:border-gray-700 text-center font-bold">${x}</th>`).join('')}</tr></thead><tbody>${tbody}</tbody></table></div>` : '';
+
+            $('todayBox').innerHTML = `
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border dark:border-gray-700 mb-6 transition-all">
+                <div class="flex flex-wrap justify-between items-center gap-3">
+                    <h2 class="text-lg font-bold flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                        <i class="fa-solid fa-calendar-day text-blue-600"></i> حصصك اليوم${d>4?' (عطلة)':''}
+                    </h2>
+                    <button onclick="toggleTT()" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/60 px-4 py-2 rounded-xl transition font-bold border border-blue-100 dark:border-blue-800">
+                        ${ttOpen ? 'إخفاء الجدول' : '<i class="fa-solid fa-calendar-week ml-1"></i> إعداد الجدول الأسبوعي'}
+                    </button>
+                </div>
+                <div class="flex flex-wrap gap-3 mt-5">
+                    ${items.map(t => {
+                        const c = visibleClasses.find(x => x.id === t.classId);
+                        if(!c) return '';
+                        return `<button onclick="openPeriod('${c.id}',${PER.indexOf(t.p)})" class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 px-4 py-2.5 rounded-xl text-sm font-bold text-blue-800 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-800/50 transition shadow-sm flex items-center gap-2 group">
+                            <span class="bg-blue-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow-sm group-hover:scale-110 transition-transform">${PER.indexOf(t.p)+1}</span>
+                            ${esc(c.name)}
+                        </button>`;
+                    }).join('') || '<div class="text-sm text-gray-500 bg-gray-50 dark:bg-gray-900 px-4 py-3 rounded-xl border dark:border-gray-700 w-full text-center font-semibold">لا توجد حصص مبرمجة لليوم في جدولك.</div>'}
+                </div>
+                ${editor}
+            </div>`;
         }
 
         const DAY = 864e5, BK = 'mz_last_backup';
