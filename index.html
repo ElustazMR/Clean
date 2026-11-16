@@ -13,7 +13,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Supabase (للتخزين السحابي) -->
+    <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
@@ -46,6 +46,10 @@
         /* تأثيرات الإدخال الخاطئ للدرجات */
         .input-error { border-color: #f43f5e !important; background-color: #fff1f2 !important; }
         .dark .input-error { background-color: #4c1d95 !important; }
+
+        /* تأثيرات صلاحيات المستخدمين وتسجيل الدخول */
+        body.teacher-mode .admin-only { display: none !important; }
+        #loginOverlay { z-index: 9999; }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen flex flex-col transition-colors duration-200 pb-24">
@@ -72,8 +76,11 @@
                 <button onclick="toggleDarkMode()" class="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1">
                     <i id="darkModeIcon" class="fa-solid fa-moon"></i> المظهر
                 </button>
-                <button onclick="openSettingsModal()" class="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-xs transition">
+                <button onclick="openSettingsModal()" class="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-xs transition admin-only">
                     <i class="fa-solid fa-gear ml-1"></i> الإعدادات
+                </button>
+                <button onclick="logout()" class="bg-rose-600 hover:bg-rose-700 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                    <i class="fa-solid fa-right-from-bracket ml-1"></i> خروج
                 </button>
             </div>
         </div>
@@ -82,11 +89,14 @@
     <!-- التنقل الرئيسي -->
     <nav class="bg-white dark:bg-gray-800 shadow border-b dark:border-gray-700 sticky top-0 z-40 no-print">
         <div class="container mx-auto px-4 flex overflow-x-auto space-x-1 space-x-reverse py-2 hide-scrollbar">
-            <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="tab-btn px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white transition flex items-center gap-2 whitespace-nowrap">
+            <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="tab-btn px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white transition flex items-center gap-2 whitespace-nowrap admin-only">
                 <i class="fa-solid fa-house"></i> الرئيسية
             </button>
             <button onclick="switchTab('classes')" id="tab-btn-classes" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2 whitespace-nowrap">
                 <i class="fa-solid fa-school"></i> الفصول
+            </button>
+            <button onclick="switchTab('teachers')" id="tab-btn-teachers" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2 whitespace-nowrap admin-only">
+                <i class="fa-solid fa-chalkboard-user"></i> المعلمون
             </button>
             <button onclick="switchTab('attendance')" id="tab-btn-attendance" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2 whitespace-nowrap">
                 <i class="fa-solid fa-clipboard-user"></i> الحضور
@@ -94,13 +104,13 @@
             <button onclick="switchTab('grades')" id="tab-btn-grades" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2 whitespace-nowrap">
                 <i class="fa-solid fa-award"></i> الدرجات
             </button>
-            <button onclick="switchTab('import')" id="tab-btn-import" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2 whitespace-nowrap">
+            <button onclick="switchTab('import')" id="tab-btn-import" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2 whitespace-nowrap admin-only">
                 <i class="fa-solid fa-file-arrow-up"></i> استيراد
             </button>
             <button onclick="switchTab('reports')" id="tab-btn-reports" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2 whitespace-nowrap">
                 <i class="fa-solid fa-chart-pie"></i> التقارير
             </button>
-            <button onclick="switchTab('backup')" id="tab-btn-backup" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2 whitespace-nowrap">
+            <button onclick="switchTab('backup')" id="tab-btn-backup" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition flex items-center gap-2 whitespace-nowrap admin-only">
                 <i class="fa-solid fa-database"></i> البيانات
             </button>
         </div>
@@ -159,7 +169,7 @@
 
         <!-- إدارة الفصول والمعلمين والمواد -->
         <section id="tab-classes" class="tab-content hidden space-y-6">
-            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border dark:border-gray-700 space-y-4">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border dark:border-gray-700 space-y-4 admin-only">
                 <h2 class="text-lg font-bold flex items-center gap-2">
                     <i class="fa-solid fa-plus-circle text-blue-600"></i> إضافة فصل دراسي
                 </h2>
@@ -180,6 +190,37 @@
                     <i class="fa-solid fa-list text-blue-600"></i> الفصول والطلاب
                 </h2>
                 <div id="classesListContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+        </section>
+
+        <!-- إدارة المعلمين -->
+        <section id="tab-teachers" class="tab-content hidden space-y-6 admin-only">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border dark:border-gray-700 space-y-6">
+                <h2 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-chalkboard-user text-blue-600"></i> إدارة واستيراد المعلمين</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="border-2 border-dashed border-gray-200 dark:border-gray-700 p-5 rounded-2xl text-center cursor-pointer hover:border-blue-500" onclick="document.getElementById('teacherExcelInput').click()">
+                        <i class="fa-solid fa-file-excel text-emerald-600 text-3xl mb-2"></i><br><span class="font-bold text-sm">استيراد Excel</span>
+                        <input type="file" id="teacherExcelInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleTeacherExcelImport(event)">
+                    </div>
+                    <div class="border-2 border-dashed border-gray-200 dark:border-gray-700 p-5 rounded-2xl text-center cursor-pointer hover:border-blue-500" onclick="document.getElementById('teacherPdfInput').click()">
+                        <i class="fa-solid fa-file-pdf text-red-500 text-3xl mb-2"></i><br><span class="font-bold text-sm">استيراد PDF</span>
+                        <input type="file" id="teacherPdfInput" accept=".pdf" class="hidden" onchange="handleTeacherPDFImport(event)">
+                    </div>
+                    <div class="border-2 border-dashed border-gray-200 dark:border-gray-700 p-5 rounded-2xl text-center cursor-pointer hover:border-blue-500" onclick="openTeacherManualModal()">
+                        <i class="fa-solid fa-keyboard text-indigo-500 text-3xl mb-2"></i><br><span class="font-bold text-sm">إدخال يدوي</span>
+                    </div>
+                </div>
+                <div id="teacherImportStatus" class="text-sm font-semibold text-center text-blue-600"></div>
+            </div>
+            
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border dark:border-gray-700">
+                <h2 class="text-lg font-bold mb-4 flex items-center gap-2">قائمة المعلمين</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right text-sm border-collapse">
+                        <thead><tr class="bg-gray-100 dark:bg-gray-700"><th class="p-3">الكود</th><th class="p-3">الاسم</th><th class="p-3">المادة</th><th class="p-3">الرقم السري</th><th class="p-3 text-center">إجراءات</th></tr></thead>
+                        <tbody id="teachersTableBody" class="divide-y divide-gray-100 dark:divide-gray-700"></tbody>
+                    </table>
+                </div>
             </div>
         </section>
 
@@ -421,6 +462,20 @@
 
     </main>
 
+    <!-- Custom Dialog HTML for replacing window.alert, window.confirm, window.prompt -->
+    <div id="mz-dialog" class="fixed inset-0 bg-black/50 z-[999] hidden flex items-center justify-center backdrop-blur-sm no-print">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl max-w-sm w-full mx-4 text-center">
+            <p id="mz-dialog-msg" class="mb-6 font-bold text-gray-800 dark:text-gray-200"></p>
+            <div id="mz-dialog-inputs" class="mb-4 hidden">
+                 <input type="text" id="mz-dialog-input" class="w-full px-4 py-2 border dark:border-gray-700 rounded-xl text-sm bg-transparent">
+            </div>
+            <div class="flex justify-center gap-3">
+                <button id="mz-dialog-cancel" class="hidden bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-xl text-sm font-bold">إلغاء</button>
+                <button id="mz-dialog-ok" class="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-bold">موافق</button>
+            </div>
+        </div>
+    </div>
+
     <!-- النوافذ المنبثقة (Modals) -->
     <!-- نافذة تقرير الطالب -->
     <div id="studentProfileModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
@@ -472,14 +527,50 @@
 
     <div id="teacherModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
-            <h3 class="text-lg font-bold"><i class="fa-solid fa-chalkboard-user text-blue-600"></i> إضافة معلم</h3>
+            <h3 class="text-lg font-bold"><i class="fa-solid fa-chalkboard-user text-blue-600"></i> ربط معلم بالفصل</h3>
             <input type="hidden" id="modalClassId">
-            <input type="text" id="modalTeacherName" placeholder="اسم المعلم" class="w-full px-4 py-2 border dark:border-gray-700 rounded-xl text-sm bg-transparent mb-2">
-            <input type="text" id="modalSubjectName" placeholder="المادة" class="w-full px-4 py-2 border dark:border-gray-700 rounded-xl text-sm bg-transparent">
+            <select id="modalTeacherSelect" class="w-full px-4 py-2 border dark:border-gray-700 rounded-xl text-sm bg-transparent mb-2 focus:ring-2 focus:ring-blue-500">
+                <option value="">-- اختر المعلم --</option>
+            </select>
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="$('teacherModal').classList.add('hidden')" class="bg-gray-100 dark:bg-gray-700 px-4 py-2 rounded-xl text-sm font-semibold">إلغاء</button>
                 <button onclick="saveTeacherToClass()" class="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold">حفظ</button>
             </div>
+        </div>
+    </div>
+
+    <div id="manualTeacherModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-xl">
+            <h3 class="text-lg font-bold"><i class="fa-solid fa-keyboard text-blue-600"></i> إدخال المعلمين يدوياً</h3>
+            <textarea id="manualTextTeachers" rows="6" placeholder="كود المعلم, اسم المعلم, المادة&#10;101, أحمد حسن, رياضيات" class="w-full p-3 border dark:border-gray-700 rounded-xl text-sm bg-transparent"></textarea>
+            <div class="flex justify-end gap-2">
+                <button onclick="$('manualTeacherModal').classList.add('hidden')" class="bg-gray-100 dark:bg-gray-700 px-4 py-2 rounded-xl text-sm font-semibold">إلغاء</button>
+                <button onclick="saveManualTeachers()" class="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold">إضافة</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Login & Change Password Overlays -->
+    <div id="loginOverlay" class="fixed inset-0 bg-gray-50 dark:bg-gray-900 flex items-center justify-center z-[100] no-print transition-all duration-300">
+        <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border dark:border-gray-700 text-center">
+            <div class="bg-blue-600 text-white p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl shadow-lg">
+                <i class="fa-solid fa-graduation-cap"></i>
+            </div>
+            <h2 class="text-2xl font-black mb-1">مُواظِب بلس</h2>
+            <p class="text-sm text-gray-500 mb-6">يرجى تسجيل الدخول للمتابعة</p>
+            <input type="text" id="loginUsername" placeholder="اسم المستخدم أو كود المعلم" class="w-full px-4 py-3 border dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 mb-3 focus:ring-2 focus:ring-blue-500 transition outline-none">
+            <input type="password" id="loginPassword" placeholder="كلمة المرور" class="w-full px-4 py-3 border dark:border-gray-700 rounded-xl text-sm bg-gray-50 dark:bg-gray-900 mb-4 focus:ring-2 focus:ring-blue-500 transition outline-none" onkeydown="if(event.key==='Enter') performLogin()">
+            <p id="loginError" class="text-rose-500 text-xs font-bold mb-4 hidden">بيانات الدخول غير صحيحة!</p>
+            <button onclick="performLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold shadow-md transition">دخول</button>
+        </div>
+    </div>
+
+    <div id="changePasswordModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-[101] flex items-center justify-center p-4 no-print">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl max-w-sm w-full border dark:border-gray-700 text-center space-y-4">
+            <h3 class="text-xl font-bold text-amber-600"><i class="fa-solid fa-shield-halved"></i> تغيير كلمة المرور</h3>
+            <p class="text-sm text-gray-500">لدواعي أمنية، يرجى تعيين كلمة مرور جديدة لحسابك.</p>
+            <input type="password" id="newPasswordInput" placeholder="كلمة المرور الجديدة" class="w-full px-4 py-2 border dark:border-gray-700 rounded-xl text-sm bg-transparent focus:ring-2 focus:ring-amber-500">
+            <button onclick="saveNewPassword()" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-xl font-bold transition">حفظ التغييرات</button>
         </div>
     </div>
 
@@ -527,10 +618,112 @@
         const clean = s => String(s ?? '').replace(/[<>]/g, '');
         window.esc = esc;
 
+        // Custom UI Modal functions to replace native alert/confirm/prompt
+        const mzDialog = (type, msg, def = '') => new Promise(resolve => {
+            const dlg = $('mz-dialog');
+            $('mz-dialog-msg').innerText = msg;
+            const inp = $('mz-dialog-input');
+            const btnCancel = $('mz-dialog-cancel');
+            const btnOk = $('mz-dialog-ok');
+            const inputsDiv = $('mz-dialog-inputs');
+            
+            inp.value = def;
+            
+            if (type === 'alert') {
+                inputsDiv.classList.add('hidden');
+                btnCancel.classList.add('hidden');
+            } else if (type === 'confirm') {
+                inputsDiv.classList.add('hidden');
+                btnCancel.classList.remove('hidden');
+            } else if (type === 'prompt') {
+                inputsDiv.classList.remove('hidden');
+                btnCancel.classList.remove('hidden');
+                setTimeout(() => inp.focus(), 100);
+            }
+            
+            dlg.classList.remove('hidden');
+            
+            const cleanup = () => {
+                dlg.classList.add('hidden');
+                btnOk.onclick = null;
+                btnCancel.onclick = null;
+            };
+            
+            btnOk.onclick = () => {
+                cleanup();
+                resolve(type === 'prompt' ? inp.value : true);
+            };
+            btnCancel.onclick = () => {
+                cleanup();
+                resolve(type === 'prompt' ? null : false);
+            };
+        });
+        window.mzAlert = msg => mzDialog('alert', msg);
+        window.mzConfirm = msg => mzDialog('confirm', msg);
+        window.mzPrompt = (msg, def) => mzDialog('prompt', msg, def);
+
+
         let db = {
-            classes: [], attendance: [], grades: {}, trash: [], timetable: [],
+            classes: [], attendance: [], grades: {}, trash: [], timetable: [], teachers: [],
             settings: { schoolName: 'ثانوية بلاط الشهداء للبنين', district: 'الإدارة العامة لمنطقة الأحمدي التعليمية', academicYear: '2027/2026', logo: '' }
         };
+
+        let currentUser = null;
+        let isAdmin = false;
+
+        /* نظام المصادقة والصلاحيات Auth */
+        function performLogin() {
+            const u = $('loginUsername').value.trim();
+            const p = $('loginPassword').value.trim();
+            if(u === 'Elustaz' && p === '1983') {
+                currentUser = { id: 'admin', role: 'admin', name: 'الإدارة' };
+                isAdmin = true;
+                finishLogin();
+            } else {
+                const t = db.teachers.find(x => x.code === u && x.password === p);
+                if(t) {
+                    currentUser = t;
+                    isAdmin = false;
+                    if(p === '1234') {
+                        $('changePasswordModal').classList.remove('hidden');
+                        return;
+                    }
+                    finishLogin();
+                } else {
+                    $('loginError').classList.remove('hidden');
+                }
+            }
+        }
+        function finishLogin() {
+            $('loginOverlay').classList.add('hidden');
+            document.body.classList.toggle('teacher-mode', !isAdmin);
+            switchTab(isAdmin ? 'dashboard' : 'classes');
+            renderClassesList();
+            populateClassSelects();
+            if(isAdmin) renderTeachersList();
+            updateDashboardStats();
+        }
+        function saveNewPassword() {
+            const np = $('newPasswordInput').value.trim();
+            if(np.length < 4) return mzAlert('كلمة المرور قصيرة جداً');
+            currentUser.password = np;
+            const dbTeacher = db.teachers.find(t => t.id === currentUser.id);
+            if(dbTeacher) dbTeacher.password = np;
+            saveDB();
+            $('changePasswordModal').classList.add('hidden');
+            finishLogin();
+        }
+        function logout() {
+            currentUser = null; isAdmin = false;
+            $('loginUsername').value = ''; $('loginPassword').value = ''; $('loginError').classList.add('hidden');
+            $('loginOverlay').classList.remove('hidden');
+        }
+
+        // جلب الفصول المسموح بها للمستخدم
+        function getVisibleClasses() {
+            if(isAdmin) return db.classes;
+            return db.classes.filter(c => (c.teachers || []).some(t => t.teacherId === currentUser.id || t.teacherName === currentUser.name));
+        }
 
         /* 1) إعداد التخزين السحابي (Supabase) */
         const { createClient } = supabase;
@@ -552,8 +745,8 @@
             }, 500);
         };
         
-        window.saveAttendance = () => { saveDB(); alert('✅ تم حفظ سجل الحضور والغياب والدرجات الشفوية سحابياً بنجاح!'); };
-        window.saveManualGrades = () => { saveDB(); alert('✅ تم حفظ كافة التعديلات على الدرجات سحابياً بنجاح!'); };
+        window.saveAttendance = async () => { saveDB(); await mzAlert('✅ تم حفظ سجل الحضور والغياب والدرجات الشفوية سحابياً بنجاح!'); };
+        window.saveManualGrades = async () => { saveDB(); await mzAlert('✅ تم حفظ كافة التعديلات على الدرجات سحابياً بنجاح!'); };
 
         /* 3) نظام التراجع (Undo) - يتم محلياً ثم يرفع للسحابة */
         const stack = [];
@@ -580,13 +773,13 @@
             catch(e) { let h=5381; for(const ch of 'mz'+p) h=((h<<5)+h+ch.charCodeAt(0))|0; return 'x'+h; }
         };
         window.setPin = async () => {
-            const p = prompt('أدخل رمزاً من 4 أرقام على الأقل:');
-            if(!p) return; if(!/^\d{4,}$/.test(p)) return alert('أرقام فقط (4 على الأقل).');
-            localStorage.setItem('mz_pin', await hashPin(p)); renderPin(); alert('تم تعيين الرمز.');
+            const p = await mzPrompt('أدخل رمزاً من 4 أرقام على الأقل:');
+            if(!p) return; if(!/^\d{4,}$/.test(p)) return await mzAlert('أرقام فقط (4 على الأقل).');
+            localStorage.setItem('mz_pin', await hashPin(p)); renderPin(); await mzAlert('تم تعيين الرمز.');
         };
         window.clearPin = async () => {
-            const p = prompt('أدخل الرمز الحالي:');
-            if(p!==null && await hashPin(p) === localStorage.getItem('mz_pin')) { localStorage.removeItem('mz_pin'); renderPin(); } else if(p!==null) alert('رمز خاطئ.');
+            const p = await mzPrompt('أدخل الرمز الحالي:');
+            if(p!==null && await hashPin(p) === localStorage.getItem('mz_pin')) { localStorage.removeItem('mz_pin'); renderPin(); } else if(p!==null) await mzAlert('رمز خاطئ.');
         };
         function renderPin() {
             const on = !!localStorage.getItem('mz_pin');
@@ -653,21 +846,22 @@
         window.openPeriod = (cid, pi) => { switchTab('attendance'); $('attendanceClassSelect').value=cid; $('lessonPeriodSelect').value=PER[pi]; $('attendanceDate').valueAsDate=new Date(); loadClassAttendance(); };
         function renderToday() {
             const d = new Date().getDay();
-            const items = db.timetable.filter(t => t.d===d && db.classes.some(c=>c.id===t.classId)).sort((a,b)=>PER.indexOf(a.p)-PER.indexOf(b.p));
-            const opts = sel => '<option value="">-</option>' + db.classes.map(c => `<option value="${c.id}" ${c.id===sel?'selected':''}>${esc(c.name)}</option>`).join('');
+            const visibleClasses = getVisibleClasses();
+            const items = db.timetable.filter(t => t.d===d && visibleClasses.some(c=>c.id===t.classId)).sort((a,b)=>PER.indexOf(a.p)-PER.indexOf(b.p));
+            const opts = sel => '<option value="">-</option>' + visibleClasses.map(c => `<option value="${c.id}" ${c.id===sel?'selected':''}>${esc(c.name)}</option>`).join('');
             const editor = ttOpen ? `<div class="overflow-x-auto mt-3"><table class="w-full text-xs border-collapse"><thead><tr><th class="p-1"></th>${DAYS.map(x=>`<th class="p-1">${x}</th>`).join('')}</tr></thead><tbody>${PER.map((p,pi)=>`<tr><td class="p-1 font-bold">${pi+1}</td>${DAYS.map((_,di)=>`<td class="p-1"><select onchange="ttSet(${di},${pi},this.value)" class="w-full border dark:border-gray-600 rounded bg-transparent p-1">${opts((db.timetable.find(t=>t.d===di&&t.p===p)||{}).classId)}</select></td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'';
-            $('todayBox').innerHTML = `<div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border dark:border-gray-700 mb-6"><div class="flex justify-between items-center"><h2 class="font-bold"><i class="fa-solid fa-calendar-day text-blue-600 ml-1"></i> حصصك اليوم${d>4?' (عطلة)':''}</h2><button onclick="toggleTT()" class="text-xs text-blue-600">${ttOpen?'إخفاء':'الجدول الأسبوعي'}</button></div><div class="flex gap-2 mt-3">${items.map(t=>{const c=db.classes.find(x=>x.id===t.classId);return `<button onclick="openPeriod('${c.id}',${PER.indexOf(t.p)})" class="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 px-4 py-2 rounded-xl text-sm font-bold">${PER.indexOf(t.p)+1} · ${esc(c.name)}</button>`}).join('')||'<span class="text-xs text-gray-400">لا حصص اليوم.</span>'}</div>${editor}</div>`;
+            $('todayBox').innerHTML = `<div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border dark:border-gray-700 mb-6"><div class="flex justify-between items-center"><h2 class="font-bold"><i class="fa-solid fa-calendar-day text-blue-600 ml-1"></i> حصصك اليوم${d>4?' (عطلة)':''}</h2><button onclick="toggleTT()" class="text-xs text-blue-600 admin-only">${ttOpen?'إخفاء':'الجدول الأسبوعي'}</button></div><div class="flex gap-2 mt-3">${items.map(t=>{const c=visibleClasses.find(x=>x.id===t.classId);return `<button onclick="openPeriod('${c.id}',${PER.indexOf(t.p)})" class="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 px-4 py-2 rounded-xl text-sm font-bold">${PER.indexOf(t.p)+1} · ${esc(c.name)}</button>`}).join('')||'<span class="text-xs text-gray-400">لا حصص اليوم.</span>'}</div>${editor}</div>`;
         }
 
         const DAY = 864e5, BK = 'mz_last_backup';
         window.exportBackupJSON = function() { localStorage.setItem(BK, Date.now()); const d="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(db)), a=document.createElement('a'); a.href=d; a.download="muwazib_backup.json"; a.click(); renderExtras(); };
-        window.importBackupJSON = e => { const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=e=>{try{db=JSON.parse(e.target.result);saveDB();renderClassesList();applySettings();updateDashboardStats();alert('تم الاسترجاع!');}catch(err){alert('ملف خاطئ');}}; r.readAsText(f); };
+        window.importBackupJSON = e => { const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=async e=>{try{db=JSON.parse(e.target.result);saveDB();renderClassesList();applySettings();updateDashboardStats();await mzAlert('تم الاسترجاع!');}catch(err){await mzAlert('ملف خاطئ');}}; r.readAsText(f); };
 
         function renderExtras() {
             const last = +localStorage.getItem(BK)||0, hasData = db.classes.some(c=>c.students.length);
             $('backupBanner').innerHTML = (hasData && Date.now()-last > 7*DAY) ? `<div class="bg-amber-50 border-amber-300 text-amber-800 p-4 rounded-2xl text-sm flex justify-between mb-6"><span><i class="fa-solid fa-triangle-exclamation"></i> نسخة احتياطية قديمة.</span><button onclick="exportBackupJSON()" class="bg-amber-600 text-white px-3 py-1 rounded-xl">تصدير الآن</button></div>`:'';
             const th = +localStorage.getItem('mz_abs_th')||3, out=[];
-            db.classes.forEach(c => {
+            getVisibleClasses().forEach(c => {
                 const recs = db.attendance.filter(a=>a.classId===c.id), dates = [...new Set(recs.map(a=>a.date))].sort();
                 if(!dates.length) return;
                 c.students.forEach(s => {
@@ -689,17 +883,17 @@
         };
 
         /* 7) الفصول والطلاب والمحذوفات */
-        const preClasses = ["10-1","10-2","11ع-1","11د-1","12ع-1","12د-1"];
+        const preClasses = ["10-1", "10-2", "10-3", "10-4", "10-5", "10-6", "10-7", "10-8", "10-9", "10-10", "11د1", "11د2", "11ع1", "11ع2", "11ع3", "11ع4", "11ع5", "11ع6", "11ع7", "11ع8", "12د1", "12د2", "12ع1", "12ع2", "12ع3", "12ع4", "12ع5", "12ع6", "12ع7", "12ع8"];
         function populateClassSelects() {
             const sel = $('presetClassSelect'); if(sel&&sel.options.length===1) preClasses.forEach(c=>sel.innerHTML+=`<option value="${c}">${c}</option>`);
             ['attendanceClassSelect','gradesClassSelect','importTargetClass','reportClassSelect'].forEach(id => {
                 const el = $(id); if(!el) return; const v=el.value;
                 el.innerHTML = id==='importTargetClass'?'<option value="">-- تلقائي --</option>':(id==='reportClassSelect'?'<option value="">-- الكل --</option>':'<option value="">-- اختر --</option>');
-                db.classes.forEach(c=>el.innerHTML+=`<option value="${c.id}">${c.name}</option>`); el.value=v;
+                getVisibleClasses().forEach(c=>el.innerHTML+=`<option value="${c.id}">${c.name}</option>`); el.value=v;
             });
         }
-        window.addNewClass = withSnap(() => {
-            const n = $('presetClassSelect').value || $('newClassName').value.trim(); if(!n) return alert('أدخل الاسم');
+        window.addNewClass = withSnap(async () => {
+            const n = $('presetClassSelect').value || $('newClassName').value.trim(); if(!n) return await mzAlert('أدخل الاسم');
             db.classes.push({ id:'cls_'+Date.now(), name:n, teachers:[], oralMax:10, projectMax:7, examMax:15, customColumns:[], students:[] });
             $('presetClassSelect').value=''; $('newClassName').value=''; renderClassesList(); populateClassSelects(); saveDB();
         });
@@ -707,18 +901,18 @@
         const rid = ()=> 'tr_'+Math.random().toString(36).slice(2,9);
         const trashPush = item => { db.trash.unshift({ id:rid(), ts:Date.now(), ...item }); db.trash = db.trash.slice(0,50); saveDB(); renderTrash(); };
         
-        window.deleteClass = withSnap(cid => {
+        window.deleteClass = withSnap(async cid => {
             const cls = db.classes.find(c=>c.id===cid); if(!cls) return;
-            if(!confirm('حذف الفصل؟')) return;
+            if(!(await mzConfirm('حذف الفصل؟'))) return;
             const copy = JSON.parse(JSON.stringify(cls)), atts = JSON.parse(JSON.stringify(db.attendance.filter(a=>a.classId===cid)));
             const grades = {}; cls.students.forEach(s=>{if(db.grades[s.id]) grades[s.id]=JSON.parse(JSON.stringify(db.grades[s.id]));});
             db.classes = db.classes.filter(c=>c.id!==cid); db.attendance = db.attendance.filter(a=>a.classId!==cid);
             trashPush({ type:'class', label:`فصل ${copy.name}`, cls:copy, atts, grades });
             saveDB(); renderClassesList(); populateClassSelects();
         });
-        window.deleteStudent = withSnap((cid,sid) => {
+        window.deleteStudent = withSnap(async (cid,sid) => {
             const cls = db.classes.find(c=>c.id===cid), st = cls&&cls.students.find(s=>s.id===sid); if(!st) return;
-            if(!confirm('حذف الطالب؟')) return;
+            if(!(await mzConfirm('حذف الطالب؟'))) return;
             const grades = db.grades[sid]?JSON.parse(JSON.stringify(db.grades[sid])):null, recs=[];
             db.attendance.forEach(a=>{const r=a.records.find(x=>x.studentId===sid); if(r) recs.push({classId:a.classId,date:a.date,period:a.period,r:{...r}});});
             cls.students = cls.students.filter(s=>s.id!==sid); delete db.grades[sid]; db.attendance.forEach(a=>a.records=a.records.filter(r=>r.studentId!==sid));
@@ -726,19 +920,31 @@
             saveDB(); renderClassesList();
         });
         
-        window.restoreTrash = id => {
+        window.restoreTrash = async id => {
             const it = db.trash.find(t=>t.id===id); if(!it) return;
             if(it.type==='class') { db.classes.push(it.cls); db.attendance.push(...it.atts); Object.assign(db.grades,it.grades); }
-            else { const c=db.classes.find(x=>x.id===it.classId); if(!c) return alert('استرجع الفصل أولاً'); c.students.push(it.st); if(it.grades) db.grades[it.st.id]=it.grades; it.recs.forEach(x=>{let a=db.attendance.find(y=>y.classId===x.classId&&y.date===x.date&&y.period===x.period); if(!a){a={classId:x.classId,date:x.date,period:x.period,records:[]};db.attendance.push(a);} a.records.push(x.r);}); }
+            else { const c=db.classes.find(x=>x.id===it.classId); if(!c) return await mzAlert('استرجع الفصل أولاً'); c.students.push(it.st); if(it.grades) db.grades[it.st.id]=it.grades; it.recs.forEach(x=>{let a=db.attendance.find(y=>y.classId===x.classId&&y.date===x.date&&y.period===x.period); if(!a){a={classId:x.classId,date:x.date,period:x.period,records:[]};db.attendance.push(a);} a.records.push(x.r);}); }
             db.trash = db.trash.filter(t=>t.id!==id); saveDB(); renderClassesList(); populateClassSelects(); renderTrash();
         };
-        window.emptyTrash = () => { if(confirm('إفراغ نهائي؟')) { db.trash=[]; saveDB(); renderTrash(); } };
+        window.emptyTrash = async () => { if(await mzConfirm('إفراغ نهائي؟')) { db.trash=[]; saveDB(); renderTrash(); } };
         function renderTrash() {
             $('trashBox').innerHTML = `<div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border mt-6"><div class="flex justify-between items-center"><h2 class="text-lg font-bold"><i class="fa-solid fa-trash-can-arrow-up text-blue-600 ml-1"></i> سلة المحذوفات (${db.trash.length})</h2>${db.trash.length?'<button onclick="emptyTrash()" class="text-xs text-rose-600 font-bold">إفراغ السلة</button>':''}</div><div class="mt-3 space-y-2">${db.trash.map(t=>`<div class="flex justify-between bg-gray-50 dark:bg-gray-900 p-2 rounded text-sm"><span>${esc(t.label)}</span><button onclick="restoreTrash('${t.id}')" class="bg-emerald-600 text-white px-2 rounded text-xs">استرجاع</button></div>`).join('')||'<p class="text-xs">فارغة</p>'}</div></div>`;
         }
 
-        window.openTeacherModal = cid => { $('modalClassId').value=cid; $('teacherModal').classList.remove('hidden'); };
-        window.saveTeacherToClass = withSnap(() => { const cid=$('modalClassId').value, t=$('modalTeacherName').value, s=$('modalSubjectName').value; const c=db.classes.find(x=>x.id===cid); if(c&&t) { c.teachers.push({id:'tc_'+Date.now(),teacherName:t,subjectName:s}); saveDB(); $('teacherModal').classList.add('hidden'); renderClassesList(); } });
+        window.openTeacherModal = cid => { 
+            $('modalClassId').value=cid; 
+            const sel = $('modalTeacherSelect');
+            sel.innerHTML = '<option value="">-- اختر المعلم --</option>' + db.teachers.map(t => `<option value="${t.id}">${t.name} (${t.subject})</option>`).join('');
+            $('teacherModal').classList.remove('hidden'); 
+        };
+        window.saveTeacherToClass = withSnap(() => { 
+            const cid=$('modalClassId').value, tid=$('modalTeacherSelect').value; 
+            const c=db.classes.find(x=>x.id===cid), tObj = db.teachers.find(x=>x.id===tid); 
+            if(c&&tObj) { 
+                c.teachers.push({id:'tc_'+Date.now(), teacherId: tObj.id, teacherName:tObj.name, subjectName:tObj.subject}); 
+                saveDB(); $('teacherModal').classList.add('hidden'); renderClassesList(); 
+            } 
+        });
         window.deleteTeacher = withSnap((cid,tid) => { const c=db.classes.find(x=>x.id===cid); if(c) { c.teachers=c.teachers.filter(x=>x.id!==tid); saveDB(); renderClassesList(); } });
         
         window.openEditStudentModal = (cid,sid) => { const c=db.classes.find(x=>x.id===cid), s=c&&c.students.find(x=>x.id===sid); if(s) { $('editStudentClassId').value=cid; $('editStudentId').value=sid; $('editStudentName').value=s.name; $('editStudentCivilId').value=s.civilId||''; $('editStudentPhone').value=s.phone||''; $('editStudentModal').classList.remove('hidden'); } };
@@ -748,10 +954,10 @@
 
         function renderClassesList() {
             const b = $('classesListContainer'); b.innerHTML = '';
-            db.classes.forEach(c => {
-                const ts = (c.teachers||[]).map(t=>`<div class="flex justify-between bg-blue-50 dark:bg-blue-950/40 px-2 py-1 rounded text-xs mb-1"><span>${t.teacherName}</span><button onclick="deleteTeacher('${c.id}','${t.id}')" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button></div>`).join('');
-                const st = c.students.map((s,i)=>`<div class="flex justify-between bg-gray-50 dark:bg-gray-900/80 px-2 py-1.5 rounded mb-1 text-xs"><span>${i+1}. ${s.name}</span><div class="flex gap-2"><button onclick="openEditStudentModal('${c.id}','${s.id}')" class="text-blue-500"><i class="fa-solid fa-pen"></i></button><button onclick="deleteStudent('${c.id}','${s.id}')" class="text-rose-500"><i class="fa-solid fa-trash"></i></button></div></div>`).join('');
-                b.innerHTML += `<div class="bg-white dark:bg-gray-800 border dark:border-gray-700 p-5 rounded-2xl flex flex-col gap-3"><div class="flex justify-between"><h3 class="font-bold">${c.name} (${c.students.length})</h3><button onclick="deleteClass('${c.id}')" class="text-rose-500"><i class="fa-solid fa-trash"></i></button></div><div><div class="flex justify-between text-xs mb-1"><span class="font-bold">المعلمين:</span><button onclick="openTeacherModal('${c.id}')" class="text-blue-600"><i class="fa-solid fa-plus"></i></button></div>${ts}</div><div class="max-h-36 overflow-y-auto">${st}</div></div>`;
+            getVisibleClasses().forEach(c => {
+                const ts = (c.teachers||[]).map(t=>`<div class="flex justify-between bg-blue-50 dark:bg-blue-950/40 px-2 py-1 rounded text-xs mb-1"><span>${t.teacherName}</span><button onclick="deleteTeacher('${c.id}','${t.id}')" class="text-rose-500 admin-only"><i class="fa-solid fa-xmark"></i></button></div>`).join('');
+                const st = c.students.map((s,i)=>`<div class="flex justify-between bg-gray-50 dark:bg-gray-900/80 px-2 py-1.5 rounded mb-1 text-xs"><span>${i+1}. ${s.name}</span><div class="flex gap-2"><button onclick="openEditStudentModal('${c.id}','${s.id}')" class="text-blue-500"><i class="fa-solid fa-pen"></i></button><button onclick="deleteStudent('${c.id}','${s.id}')" class="text-rose-500 admin-only"><i class="fa-solid fa-trash"></i></button></div></div>`).join('');
+                b.innerHTML += `<div class="bg-white dark:bg-gray-800 border dark:border-gray-700 p-5 rounded-2xl flex flex-col gap-3"><div class="flex justify-between"><h3 class="font-bold">${c.name} (${c.students.length})</h3><button onclick="deleteClass('${c.id}')" class="text-rose-500 admin-only"><i class="fa-solid fa-trash"></i></button></div><div><div class="flex justify-between text-xs mb-1"><span class="font-bold">المعلمين:</span><button onclick="openTeacherModal('${c.id}')" class="text-blue-600 admin-only"><i class="fa-solid fa-plus"></i></button></div>${ts}</div><div class="max-h-36 overflow-y-auto">${st}</div></div>`;
             });
         }
 
@@ -771,7 +977,7 @@
         function cardHtml(s, i, cls, rec, x) {
             const st=rec.status, o=(db.grades[s.id]&&db.grades[s.id].oralScore)||0;
             const btns = Object.keys(STYLE).map(k=>`<button onclick="setStatus('${s.id}','${k}')" class="min-w-[44px] h-11 rounded-xl text-sm font-black border ${k===st?STYLE[k][0]+' text-white border-transparent':'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300'}">${SHORT[k]}</button>`).join('');
-            const wa = s.phone?`<a href="https://wa.me/${s.phone.replace(/\D/g,'')}?text=${encodeURIComponent(`الطالب ${s.name} (${st}) بتاريخ ${x.dt}`)}" target="_blank" class="bg-emerald-500 text-white w-11 h-11 rounded-xl flex items-center justify-center"><i class="fa-brands fa-whatsapp"></i></a>`:'';
+            const wa = s.phone?`<a href="javascript:void(0)" onclick="window.open('https://wa.me/${s.phone.replace(/\D/g,'')}?text=${encodeURIComponent(`الطالب ${s.name} (${st}) بتاريخ ${x.dt}`)}', '_blank')" class="bg-emerald-500 text-white w-11 h-11 rounded-xl flex items-center justify-center"><i class="fa-brands fa-whatsapp"></i></a>`:'';
             return `<div id="card_${s.id}" class="${STYLE[st][1]} border-2 rounded-2xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-3"><div class="flex items-center gap-2 flex-grow"><span class="bg-white dark:bg-gray-800 px-2 py-1 rounded text-xs">${i+1}</span><h3 class="font-bold text-sm">${esc(s.name)}</h3></div><div class="flex flex-wrap items-center gap-2"><div class="flex gap-1">${btns}</div><input type="number" max="${cls.oralMax}" value="${o}" oninput="updateMasterScore('${s.id}','oralScore',${cls.oralMax},this.value,this)" class="w-14 h-11 text-center border dark:border-gray-600 rounded-xl text-xs font-bold text-blue-600 bg-white dark:bg-gray-800"><input type="text" value="${esc(rec.note||'')}" oninput="setNote('${s.id}',this.value)" placeholder="ملاحظة..." class="w-28 h-11 px-2 border dark:border-gray-600 rounded-xl text-xs bg-white dark:bg-gray-800"><button onclick="openStudentProfile('${s.id}')" class="bg-amber-500 text-white w-11 h-11 rounded-xl"><i class="fa-solid fa-comment-dots"></i></button>${wa}</div></div>`;
         }
         function updateBottomBar(t,p,a,l) { $('bottomTotalStudents').innerText=t; $('bottomPresentStudents').innerText=p; $('bottomAbsentStudents').innerText=a; $('bottomLateStudents').innerText=l; }
@@ -807,8 +1013,8 @@
             container.innerHTML = html + `</tbody></table>`;
         };
         window.loadSpecificLog = function(date, period) { $('attendanceDate').value = date; $('lessonPeriodSelect').value = period; loadClassAttendance(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-        window.deleteLog = withSnap(function(date, period) { if(!confirm(`حذف سجل تاريخ ${date} - ${period} بالكامل؟`)) return; const classId = $('attendanceClassSelect').value; db.attendance = db.attendance.filter(a => !(a.classId === classId && a.date === date && a.period === period)); saveDB(); renderAttendanceLogs(); if($('attendanceDate').value === date && $('lessonPeriodSelect').value === period) loadClassAttendance(); });
-        window.changeLogPeriod = withSnap(function(oldDate, oldPeriod) { const classId = $('attendanceClassSelect').value; const newDate = prompt("تعديل التاريخ (YYYY-MM-DD):", oldDate); if(!newDate) return; const periods = ['الحصة الأولى','الحصة الثانية','الحصة الثالثة','الحصة الرابعة','الحصة الخامسة','الحصة السادسة','الحصة السابعة']; let msg="اختر الحصة:\n"; periods.forEach((p,i)=>msg+=`${i+1}. ${p}\n`); const idx = prompt(msg, periods.indexOf(oldPeriod)+1); if(!idx||isNaN(idx)||idx<1||idx>7) return alert('إلغاء.'); const newPeriod = periods[idx-1]; if((newDate!==oldDate || newPeriod!==oldPeriod) && db.attendance.find(a=>a.classId===classId&&a.date===newDate&&a.period===newPeriod)) return alert('يوجد سجل بهذا الوقت مسبقاً.'); const log = db.attendance.find(a=>a.classId===classId&&a.date===oldDate&&a.period===oldPeriod); if(log){ log.date=newDate; log.period=newPeriod; saveDB(); renderAttendanceLogs(); if($('attendanceDate').value===oldDate && $('lessonPeriodSelect').value===oldPeriod) { $('attendanceDate').value=newDate; $('lessonPeriodSelect').value=newPeriod; loadClassAttendance(); } } });
+        window.deleteLog = withSnap(async function(date, period) { if(!(await mzConfirm(`حذف سجل تاريخ ${date} - ${period} بالكامل؟`))) return; const classId = $('attendanceClassSelect').value; db.attendance = db.attendance.filter(a => !(a.classId === classId && a.date === date && a.period === period)); saveDB(); renderAttendanceLogs(); if($('attendanceDate').value === date && $('lessonPeriodSelect').value === period) loadClassAttendance(); });
+        window.changeLogPeriod = withSnap(async function(oldDate, oldPeriod) { const classId = $('attendanceClassSelect').value; const newDate = await mzPrompt("تعديل التاريخ (YYYY-MM-DD):", oldDate); if(!newDate) return; const periods = ['الحصة الأولى','الحصة الثانية','الحصة الثالثة','الحصة الرابعة','الحصة الخامسة','الحصة السادسة','الحصة السابعة']; let msg="اختر الحصة:\n"; periods.forEach((p,i)=>msg+=`${i+1}. ${p}\n`); const idx = await mzPrompt(msg, periods.indexOf(oldPeriod)+1); if(!idx||isNaN(idx)||idx<1||idx>7) return await mzAlert('إلغاء.'); const newPeriod = periods[idx-1]; if((newDate!==oldDate || newPeriod!==oldPeriod) && db.attendance.find(a=>a.classId===classId&&a.date===newDate&&a.period===newPeriod)) return await mzAlert('يوجد سجل بهذا الوقت مسبقاً.'); const log = db.attendance.find(a=>a.classId===classId&&a.date===oldDate&&a.period===oldPeriod); if(log){ log.date=newDate; log.period=newPeriod; saveDB(); renderAttendanceLogs(); if($('attendanceDate').value===oldDate && $('lessonPeriodSelect').value===oldPeriod) { $('attendanceDate').value=newDate; $('lessonPeriodSelect').value=newPeriod; loadClassAttendance(); } } });
 
         /* 9) الدرجات مع التقدير والترتيب */
         function setScore(sid, f, m, v, el, isCol) {
@@ -823,9 +1029,9 @@
         window.updateCustomScore = (sid,f,m,v,el) => setScore(sid,f,m,v,el,true);
         window.updateBaseMax = withSnap((cid,f,v) => { const c=db.classes.find(x=>x.id===cid); if(c) { c[f]=parseFloat(v)||0; loadMasterGrades(); } });
         
-        window.openCustomColModal = () => { if($('gradesClassSelect').value) $('customColModal').classList.remove('hidden'); else alert('اختر الفصل أولاً'); };
+        window.openCustomColModal = async () => { if($('gradesClassSelect').value) $('customColModal').classList.remove('hidden'); else await mzAlert('اختر الفصل أولاً'); };
         window.saveCustomColumn = withSnap(() => { const cid=$('gradesClassSelect').value, c=db.classes.find(x=>x.id===cid), n=$('modalColName').value, m=+$('modalColMax').value; if(c&&n) { c.customColumns.push({id:'col_'+Date.now(), name:n, maxScore:m}); saveDB(); $('customColModal').classList.add('hidden'); loadMasterGrades(); } });
-        window.deleteCustomColumn = withSnap((cid, colId) => { const c=db.classes.find(x=>x.id===cid); if(c&&confirm('حذف العمود؟')) { c.customColumns = c.customColumns.filter(x=>x.id!==colId); saveDB(); loadMasterGrades(); } });
+        window.deleteCustomColumn = withSnap(async (cid, colId) => { const c=db.classes.find(x=>x.id===cid); if(c && await mzConfirm('حذف العمود؟')) { c.customColumns = c.customColumns.filter(x=>x.id!==colId); saveDB(); loadMasterGrades(); } });
 
         const maxOf = c => (c.oralMax||0) + (c.projectMax||0) + (c.examMax||0) + (c.customColumns||[]).reduce((s,col)=>s+col.maxScore,0);
         const LET = [[90,'ممتاز','text-emerald-600'], [80,'جيد جداً','text-blue-600'], [65,'جيد','text-indigo-600'], [50,'مقبول','text-amber-600'], [0,'ضعيف','text-rose-600']];
@@ -872,7 +1078,7 @@
             db.attendance.forEach(att=>{att.records.forEach(r=>{if(r.studentId===sid){if(r.status==='حاضر')p++; if(r.status==='غائب')a++; if(r.status==='متأخر')l++; h+=`<div class="p-2 border rounded mb-1 text-xs"><b>${att.date}</b>: ${r.status} ${r.note?' - '+r.note:''}</div>`;}})});
             $('profilePresentCount').innerText=p; $('profileAbsentCount').innerText=a; $('profileLateCount').innerText=l; $('profileOralScore').innerText=g.oralScore||0; $('profileProjectScore').innerText=g.projectScore||0; $('profileExamScore').innerText=g.examScore||0; $('profileNotesList').innerHTML=h||'لا سجلات';
             const msg = encodeURIComponent(`تقرير الطالب: ${st.name}\nحضور: ${p} | غياب: ${a}\nشفوي: ${g.oralScore||0} | مجموع: ${(g.oralScore||0)+(g.projectScore||0)+(g.examScore||0)}`);
-            $('sendGuardianWhatsappBtn').onclick = () => st.phone?window.open(`https://wa.me/${st.phone.replace(/\D/g,'')}?text=${msg}`):alert('لا يوجد هاتف');
+            $('sendGuardianWhatsappBtn').onclick = async () => st.phone?window.open(`https://wa.me/${st.phone.replace(/\D/g,'')}?text=${msg}`):await mzAlert('لا يوجد هاتف');
             $('studentProfileModal').classList.remove('hidden');
         };
         window.closeStudentProfile = () => $('studentProfileModal').classList.add('hidden');
@@ -885,7 +1091,7 @@
             ['Status','Oral','Project','Exam','Total'].forEach(k => document.querySelectorAll(`.col-${k.toLowerCase()}`).forEach(e=>e.style.display=$(`colOpt${k}`).checked?'':'none'));
             
             let html='', tp=0, ta=0, tl=0, te=0, to=0, tx=0, cnt=0;
-            (cid?[cObj]:db.classes).forEach(c => c.students.forEach((s,i) => {
+            (cid?[cObj]:getVisibleClasses()).forEach(c => c.students.forEach((s,i) => {
                 if(sid && s.id!==sid) return;
                 let sp=0, sa=0, sl=0, se=0;
                 db.attendance.filter(a=>a.classId===c.id).forEach(a=>{ const d=new Date(a.date), now=new Date(); if(p==='month'&&(d.getMonth()!==now.getMonth()||d.getFullYear()!==now.getFullYear())) return; if(p==='year'&&d.getFullYear()!==now.getFullYear()) return; a.records.forEach(r=>{if(r.studentId===s.id){if(r.status==='حاضر')sp++; else if(r.status==='غائب')sa++; else if(r.status==='متأخر')sl++; else se++;}}); });
@@ -900,7 +1106,7 @@
             attChart = new Chart($('attendanceChart').getContext('2d'), { type:'doughnut', data:{labels:['حاضر','غائب','متأخر','عذر'],datasets:[{data:[tp,ta,tl,te],backgroundColor:['#10b981','#f43f5e','#f59e0b','#3b82f6']}]} });
 
             const names=[], att=[], gr=[];
-            db.classes.filter(c=>c.students.length).forEach(cls => {
+            getVisibleClasses().filter(c=>c.students.length).forEach(cls => {
                 let cp=0, cn=0; db.attendance.filter(a=>a.classId===cls.id).forEach(a=>a.records.forEach(r=>{cn++; if(r.status==='حاضر'||r.status==='متأخر')cp++;}));
                 const max = maxOf(cls)||1, avg = cls.students.reduce((S,st)=>{const g=db.grades[st.id]||{}; return S+(g.oralScore||0)+(g.projectScore||0)+(g.examScore||0)+Object.values(g.customScores||{}).reduce((x,y)=>x+(y||0),0);},0)/cls.students.length;
                 names.push(cls.name); att.push(cn?+(cp/cn*100).toFixed(1):0); gr.push(+(avg/max*100).toFixed(1));
@@ -908,50 +1114,50 @@
             if(cmp) cmp.destroy();
             cmp = new Chart($('cmpChart').getContext('2d'), { type:'bar', data:{labels:names, datasets:[{label:'الحضور %',data:att,backgroundColor:'#10b981'},{label:'متوسط الدرجات %',data:gr,backgroundColor:'#6366f1'}]}, options:{responsive:true, maintainAspectRatio:false, scales:{y:{min:0,max:100}}} });
         };
-        window.onReportClassChange = () => { const cid=$('reportClassSelect').value, sel=$('reportStudentSelect'); sel.innerHTML='<option value="">-- الكل --</option>'; (cid?[db.classes.find(c=>c.id===cid)]:db.classes).forEach(c=>c&&c.students.forEach(s=>sel.innerHTML+=`<option value="${s.id}">${s.name}</option>`)); generateReports(); };
+        window.onReportClassChange = () => { const cid=$('reportClassSelect').value, sel=$('reportStudentSelect'); sel.innerHTML='<option value="">-- الكل --</option>'; (cid?[getVisibleClasses().find(c=>c.id===cid)]:getVisibleClasses()).forEach(c=>c&&c.students.forEach(s=>sel.innerHTML+=`<option value="${s.id}">${s.name}</option>`)); generateReports(); };
 
         /* 11) التحميل الديناميكي للطباعة والتصدير والاستيراد */
         const LIB = { XLSX:'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', Tesseract:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js', pdfjsLib:'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', html2pdf:'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js', Chart:'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js' };
         const pending = {}; const loadScript = n => window[n]?Promise.resolve():(pending[n]||(pending[n]=new Promise((res,rej)=>{const s=document.createElement('script');s.src=LIB[n];s.onload=res;s.onerror=rej;document.head.appendChild(s);})));
         
         /* طباعة وتصدير الإكسل والـ PDF */
-        window.exportMasterGradesExcel = async () => { await loadScript('XLSX'); const container=$('masterGradesContainer'); const t=container?container.querySelector('table'):null; if(t) XLSX.writeFile(XLSX.utils.table_to_book(t), 'Grades.xlsx'); else alert('لا توجد بيانات'); };
+        window.exportMasterGradesExcel = async () => { await loadScript('XLSX'); const container=$('masterGradesContainer'); const t=container?container.querySelector('table'):null; if(t) XLSX.writeFile(XLSX.utils.table_to_book(t), 'Grades.xlsx'); else await mzAlert('لا توجد بيانات'); };
         window.exportExcelReport = async () => { await loadScript('XLSX'); XLSX.writeFile(XLSX.utils.table_to_book($('reportPrintArea').querySelector('table')), 'Report.xlsx'); };
         window.exportPDFReport = () => window.print();
         window.exportSingleStudentPDF = async () => { await loadScript('html2pdf'); html2pdf().from($('studentProfilePrintArea')).set({margin:10,filename:'Student.pdf',html2canvas:{scale:2},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).save(); };
         
-        window.printMasterGrades = () => {
-            const cid = $('gradesClassSelect').value; if(!cid) return alert('اختر الفصل لطباعة درجاته');
+        window.printMasterGrades = async () => {
+            const cid = $('gradesClassSelect').value; if(!cid) return await mzAlert('اختر الفصل لطباعة درجاته');
             const cls = db.classes.find(c=>c.id===cid), tableHTML = $('masterGradesContainer').innerHTML;
             let win = window.open('', '_blank');
             win.document.write(`<html dir="rtl"><head><title>كشف درجات - ${cls.name}</title><style>body{font-family:'Cairo',sans-serif;padding:20px;direction:rtl}.header{text-align:center;margin-bottom:20px;border-bottom:2px solid #333;padding-bottom:10px}table{width:100%;border-collapse:collapse;margin-top:20px;text-align:center;font-size:12px}th,td{border:1px solid #000;padding:8px}th{background-color:#f0f0f0}input{border:none;text-align:center;background:transparent;font-weight:bold;width:100%;font-family:inherit}button{display:none!important}</style></head><body><div class="header"><h2>${db.settings.schoolName}</h2><h3>كشف درجات - ${cls.name}</h3></div>${tableHTML}<div style="margin-top: 30px; font-weight: bold; font-size: 14px; text-align: left; direction: rtl;">تصميم وتطوير : Rمحمد رضاM</div></body></html>`);
             win.document.close(); setTimeout(()=>{win.print();}, 500);
         };
-        window.printBlankSheet = () => {
-            const cid = $('attendanceClassSelect').value; if(!cid) return alert('اختر الفصل');
+        window.printBlankSheet = async () => {
+            const cid = $('attendanceClassSelect').value; if(!cid) return await mzAlert('اختر الفصل');
             const cls = db.classes.find(c=>c.id===cid), d=$('attendanceDate').value, p=$('lessonPeriodSelect').value;
             let win = window.open('', '_blank');
             win.document.write(`<html dir="rtl"><head><title>حضور - ${cls.name}</title><style>body{font-family:'Cairo',sans-serif;padding:25px}.header{text-align:center;border-bottom:2px solid #333;padding-bottom:10px}.meta{display:flex;justify-content:space-between;font-weight:bold;margin:15px 0}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #444;padding:8px;text-align:center}th{background-color:#f2f2f2}td.name{text-align:right;font-weight:bold}</style></head><body><div class="header"><h3>${db.settings.schoolName}</h3><h4>كشف الحضور - ${cls.name}</h4></div><div class="meta"><span>التاريخ: ${d}</span><span>الحصة: ${p}</span></div><table><thead><tr><th style="width:50px">#</th><th style="text-align:right">الاسم</th><th style="width:80px">حاضر</th><th style="width:80px">غائب</th><th style="width:80px">متأخر</th><th style="width:80px">عذر</th><th style="width:150px">ملاحظات</th></tr></thead><tbody>${cls.students.map((s,i)=>`<tr><td>${i+1}</td><td class="name">${s.name}</td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}</tbody></table><div style="margin-top: 30px; font-weight: bold; font-size: 14px; display: flex; justify-content: space-between;"><span>إشراف المعلم: ........................</span><span>تصميم وتطوير : Rمحمد رضاM</span></div></body></html>`);
             win.document.close(); win.print();
         };
-        window.printAbsenceSheet = () => {
+        window.printAbsenceSheet = async () => {
             const cid = $('attendanceClassSelect').value, d=$('attendanceDate').value, p=$('lessonPeriodSelect').value;
-            if(!cid||!d) return alert('اختر الفصل والتاريخ');
+            if(!cid||!d) return await mzAlert('اختر الفصل والتاريخ');
             const cls = db.classes.find(c=>c.id===cid), att = db.attendance.find(a=>a.classId===cid&&a.date===d&&a.period===p);
             let abs=[]; if(att) att.records.forEach(r=>{if(r.status==='غائب'||r.status==='متأخر'){const st=cls.students.find(s=>s.id===r.studentId); if(st) abs.push({...st,st:r.status,n:r.note});}});
             let win = window.open('', '_blank');
             win.document.write(`<html dir="rtl"><head><title>غياب - ${cls.name}</title><style>body{font-family:'Cairo',sans-serif;padding:25px}.header{text-align:center;border-bottom:2px solid #333;padding-bottom:10px}.meta{display:flex;justify-content:space-between;font-weight:bold;margin:15px 0}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #444;padding:8px;text-align:center}th{background-color:#f2f2f2}td.name{text-align:right;font-weight:bold}</style></head><body><div class="header"><h3>${db.settings.schoolName}</h3><h4 style="color:#b91c1c">الغياب والتأخير - ${cls.name}</h4></div><div class="meta"><span>التاريخ: ${d}</span><span>الحصة: ${p}</span></div><table><thead><tr><th style="width:50px">#</th><th style="text-align:right">الاسم</th><th style="width:120px">الحالة</th><th style="text-align:right">ملاحظة</th></tr></thead><tbody>${abs.length?abs.map((s,i)=>`<tr><td>${i+1}</td><td class="name">${s.name}</td><td style="color:${s.st==='غائب'?'#dc2626':'#d97706'};font-weight:bold">${s.st}</td><td>${s.n||'-'}</td></tr>`).join(''):'<tr><td colspan="4" style="padding:20px;font-weight:bold;color:#10b981">لا يوجد غياب أو تأخير!</td></tr>'}</tbody></table><div style="margin-top: 30px; font-weight: bold; font-size: 14px; display: flex; justify-content: space-between;"><span>إشراف المعلم: ........................</span><span>تصميم وتطوير : Rمحمد رضاM</span></div></body></html>`);
             win.document.close(); win.print();
         };
-        window.exportMinisterialReport = () => {
-            const cid = $('reportClassSelect').value; if(!cid) return alert('اختر فصل من القائمة العلوية للكشف الرسمي');
+        window.exportMinisterialReport = async () => {
+            const cid = $('reportClassSelect').value; if(!cid) return await mzAlert('اختر فصل من القائمة العلوية للكشف الرسمي');
             const cls = db.classes.find(c=>c.id===cid);
             let win = window.open('', '_blank');
             win.document.write(`<html dir="rtl"><head><title>كشف رسمي - ${cls.name}</title><style>body{font-family:'Cairo',sans-serif;padding:25px}.header{text-align:center;border-bottom:2px solid #333;padding-bottom:10px}.meta{display:flex;justify-content:space-between;font-weight:bold;margin:15px 0;font-size:14px}table{width:100%;border-collapse:collapse;font-size:13px;text-align:center}th,td{border:1px solid #000;padding:8px}th{background-color:#f2f2f2}td.name{text-align:right;font-weight:bold}</style></head><body><div class="header"><h4>${db.settings.district||'الإدارة'}</h4><h3>${db.settings.schoolName}</h3><h3>الكشف الرسمي للدرجات - ${cls.name}</h3></div><div class="meta"><span>الفصل: ${cls.name}</span><span>العام الدراسي: ${db.settings.academicYear||'2027/2026'}</span></div><table><thead><tr><th>#</th><th style="text-align:right">الاسم</th><th>الشفوي (من ${cls.oralMax||10})</th><th>المشروع (من ${cls.projectMax||7})</th><th>الاختبار (من ${cls.examMax||15})</th><th>المجموع</th><th>ملاحظات</th></tr></thead><tbody>${cls.students.map((s,i)=>{const g=db.grades[s.id]||{}, sum=(g.oralScore||0)+(g.projectScore||0)+(g.examScore||0)+Object.values(g.customScores||{}).reduce((x,y)=>x+(y||0),0); return `<tr><td>${i+1}</td><td class="name">${s.name}</td><td>${g.oralScore||0}</td><td>${g.projectScore||0}</td><td>${g.examScore||0}</td><td style="font-weight:bold;background:#eef">${sum}</td><td></td></tr>`}).join('')}</tbody></table><div style="margin-top: 30px; font-weight: bold; font-size: 14px; display: flex; justify-content: space-between;"><span>يعتمد، مدير المدرسة: ........................</span><span>تصميم وتطوير : Rمحمد رضاM</span></div></body></html>`);
             win.document.close(); win.print();
         };
 
-        window.handleExcelImport = async e => { await loadScript('XLSX'); const f=e.target.files[0], cid=$('importTargetClass').value; if(!f||!cid) return; const r=new FileReader(); r.onload=x=>{const rows=XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(x.target.result),{type:'array'}).Sheets[XLSX.read(new Uint8Array(x.target.result),{type:'array'}).SheetNames[0]],{header:1}), c=db.classes.find(y=>y.id===cid); rows.forEach(row=>{if(row[0]) c.students.push({id:'std_'+Math.random().toString(36).substr(2,9), civilId:row[1]?String(row[1]):'', name:row[2]?String(row[2]):String(row[0])});}); saveDB(); renderClassesList(); alert('تم الاستيراد');}; r.readAsArrayBuffer(f); };
+        window.handleExcelImport = async e => { await loadScript('XLSX'); const f=e.target.files[0], cid=$('importTargetClass').value; if(!f||!cid) return; const r=new FileReader(); r.onload=async x=>{const rows=XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(x.target.result),{type:'array'}).Sheets[XLSX.read(new Uint8Array(x.target.result),{type:'array'}).SheetNames[0]],{header:1}), c=db.classes.find(y=>y.id===cid); rows.forEach(row=>{if(row[0]) c.students.push({id:'std_'+Math.random().toString(36).substr(2,9), civilId:row[1]?String(row[1]):'', name:row[2]?String(row[2]):String(row[0])});}); saveDB(); renderClassesList(); await mzAlert('تم الاستيراد');}; r.readAsArrayBuffer(f); };
         window.handleImageOCR = async e => { await loadScript('Tesseract'); const f=e.target.files[0], cid=$('importTargetClass').value; if(!f||!cid) return; $('importStatus').innerText='جاري القراءة...'; Tesseract.recognize(f,'ara+eng').then(res=>{const c=db.classes.find(y=>y.id===cid); res.data.text.split('\n').forEach(l=>{if(l.trim().length>5) c.students.push({id:'std_'+Math.random().toString(36).substr(2,9),name:l.trim()});}); saveDB(); renderClassesList(); $('importStatus').innerText='نجاح';}).catch(()=>$('importStatus').innerText='فشل'); };
         window.handlePDFMultiImport = async e => {
             await loadScript('pdfjsLib'); const f=e.target.files[0], targetId=$('importTargetClass').value; if(!f) return; $('importStatus').innerText='جاري التحليل...';
@@ -963,7 +1169,7 @@
             const container = $('globalSearchResults'); container.innerHTML = ''; const q = query.trim().toLowerCase(); if(!q) return;
             const normalizeArabic = (text) => text.replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\u064B-\u065F]/g, '');
             const normalizedQuery = normalizeArabic(q).replace(/\s+/g, ' '); let results = [];
-            db.classes.forEach(cls => {
+            getVisibleClasses().forEach(cls => {
                 cls.students.forEach(student => {
                     const normalizedName = normalizeArabic(student.name.toLowerCase()).replace(/\s+/g, ' ');
                     if(normalizedName.includes(normalizedQuery) || (student.civilId && student.civilId.includes(q))) {
@@ -974,6 +1180,72 @@
             container.innerHTML = results.length ? results.join('') : `<div class="col-span-full text-center text-gray-400 text-xs py-2">لا توجد نتائج مطابقة لـ "${esc(query)}"</div>`;
         };
 
+        /* نظام إدارة المعلمين من قبل الإدارة */
+        window.openTeacherManualModal = () => $('manualTeacherModal').classList.remove('hidden');
+        window.saveManualTeachers = withSnap(() => { 
+            const t=$('manualTextTeachers').value.trim();
+            if(t) { 
+                t.split('\n').forEach(l=>{
+                    const p=l.split(','); 
+                    if(p[0].trim() && p[1]) {
+                        db.teachers.push({id:'tch_'+Math.random().toString(36).substr(2,9), code: p[0].trim(), name:p[1].trim(), subject:p[2]?p[2].trim():'', password: '1234', role: 'teacher'});
+                    }
+                }); 
+                saveDB(); $('manualTeacherModal').classList.add('hidden'); $('manualTextTeachers').value=''; renderTeachersList(); 
+            } 
+        });
+        window.handleTeacherExcelImport = async e => { 
+            await loadScript('XLSX'); const f=e.target.files[0]; if(!f) return; 
+            const r=new FileReader(); 
+            r.onload=async x=>{
+                const rows=XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(x.target.result),{type:'array'}).Sheets[XLSX.read(new Uint8Array(x.target.result),{type:'array'}).SheetNames[0]],{header:1}); 
+                rows.forEach(row=>{
+                    if(row[0] && row[1]) db.teachers.push({id:'tch_'+Math.random().toString(36).substr(2,9), code: String(row[0]), name:String(row[1]), subject:row[2]?String(row[2]):'', password: '1234', role: 'teacher'});
+                }); 
+                saveDB(); renderTeachersList(); await mzAlert('تم الاستيراد');
+            }; 
+            r.readAsArrayBuffer(f); 
+        };
+        window.handleTeacherPDFImport = async e => {
+            await loadScript('pdfjsLib'); const f=e.target.files[0]; if(!f) return; $('teacherImportStatus').innerText='جاري التحليل...';
+            const r=new FileReader(); 
+            r.onload=async function(){ 
+                try{ 
+                    const pdf=await pdfjsLib.getDocument(new Uint8Array(this.result)).promise; 
+                    let ex=0; 
+                    for(let i=1;i<=pdf.numPages;i++){
+                        const txt=await (await pdf.getPage(i)).getTextContent(), items=txt.items.map(x=>x.str.trim()).filter(Boolean);
+                        for(let j=0; j<items.length-1; j++) {
+                            if(/^\d{3,6}$/.test(items[j]) && items[j+1].length > 3) {
+                                db.teachers.push({id:'tch_'+Math.random().toString(36).substr(2,9), code: items[j], name:items[j+1], subject:'', password: '1234', role: 'teacher'});
+                                ex++;
+                            }
+                        }
+                    } 
+                    saveDB(); renderTeachersList(); $('teacherImportStatus').innerText=`تم استيراد ${ex} معلم.`; 
+                }catch(e){$('teacherImportStatus').innerText='خطأ بالتحليل.';} 
+            }; 
+            r.readAsArrayBuffer(f);
+        };
+        window.deleteGlobalTeacher = withSnap(async (id) => {
+            if(await mzConfirm('حذف المعلم نهائياً؟')) {
+                db.teachers = db.teachers.filter(t => t.id !== id);
+                db.classes.forEach(c => c.teachers = c.teachers.filter(t => t.teacherId !== id));
+                saveDB(); renderTeachersList(); renderClassesList();
+            }
+        });
+        window.resetGlobalTeacher = withSnap(async (id) => {
+            if(await mzConfirm('إعادة تعيين الرقم السري ليكون 1234؟')) {
+                const t = db.teachers.find(t => t.id === id);
+                if(t) { t.password = '1234'; saveDB(); renderTeachersList(); await mzAlert('تم إعادة التعيين'); }
+            }
+        });
+        function renderTeachersList() {
+            const tb = $('teachersTableBody'); if(!tb) return;
+            tb.innerHTML = db.teachers.map(t => `<tr><td class="p-3 font-bold">${t.code}</td><td class="p-3">${t.name}</td><td class="p-3">${t.subject}</td><td class="p-3 text-gray-400 text-xs">${t.password === '1234' ? 'افتراضي (1234)' : 'مخصص'}</td><td class="p-3 text-center"><button onclick="resetGlobalTeacher('${t.id}')" class="text-amber-500 ml-2" title="إعادة تعيين الرقم السري"><i class="fa-solid fa-key"></i></button><button onclick="deleteGlobalTeacher('${t.id}')" class="text-rose-500" title="حذف المعلم"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
+        }
+
+
         /* 13) التهيئة السحابية عند بدء التطبيق */
         async function initCloudDB() {
             try {
@@ -981,6 +1253,7 @@
                 if (data && data.db_data) {
                     db = data.db_data;
                     if(!db.grades) db.grades = {}; if(!db.trash) db.trash = []; if(!db.timetable) db.timetable = [];
+                    if(!db.teachers) db.teachers = [];
                     if(!db.settings) db.settings = { schoolName: 'ثانوية بلاط الشهداء للبنين', district: 'الإدارة العامة لمنطقة الأحمدي التعليمية', academicYear: '2027/2026', logo: '' };
                 }
             } catch (e) {
@@ -988,11 +1261,9 @@
             }
             
             applySettings();
-            populateClassSelects();
-            renderClassesList();
-            updateDashboardStats();
-            lockScreen();
-            showUndo();
+            
+            // عرض واجهة تسجيل الدخول بدلاً من فتح التطبيق فوراً
+            $('loginOverlay').classList.remove('hidden');
         }
 
         // تشغيل التهيئة
