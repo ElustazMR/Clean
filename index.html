@@ -13,6 +13,8 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase (للتخزين السحابي) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap');
@@ -214,7 +216,7 @@
 
             <div class="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 p-4 rounded-2xl text-xs text-blue-800 dark:text-blue-200 flex items-center gap-3">
                 <i class="fa-solid fa-circle-info text-lg"></i>
-                <span>يتم حفظ الحضور والدرجات تلقائياً بمجرد إدخالها. زر الحفظ أدناه للتأكيد اليدوي فقط.</span>
+                <span>يتم حفظ الحضور والدرجات سحابياً تلقائياً بمجرد إدخالها. زر الحفظ أدناه للتأكيد اليدوي فقط.</span>
             </div>
 
             <!-- قائمة كروت الطلاب -->
@@ -514,36 +516,42 @@
         </div>
     </div>
 
-    <!-- السكربت الرئيسي -->
+    <!-- السكربت الرئيسي المدمج بالكامل مع Supabase -->
     <script>
         const $ = id => document.getElementById(id);
         const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         const clean = s => String(s ?? '').replace(/[<>]/g, '');
         window.esc = esc;
 
-        const KEY = 'muwazib_db_v21';
-        let db = JSON.parse(localStorage.getItem(KEY)) || {
+        let db = {
             classes: [], attendance: [], grades: {}, trash: [], timetable: [],
             settings: { schoolName: 'ثانوية بلاط الشهداء للبنين', district: 'الإدارة العامة لمنطقة الأحمدي التعليمية', academicYear: '2027/2026', logo: '' }
         };
-        if(!db.grades) db.grades = {}; if(!db.trash) db.trash = []; if(!db.timetable) db.timetable = [];
-        if(!db.settings.academicYear) db.settings.academicYear = '2027/2026';
 
-        /* 1) الحفظ التلقائي والتنظيف */
+        /* 1) إعداد التخزين السحابي (Supabase) */
+        const { createClient } = supabase;
+        const supabaseUrl = 'https://eklevvbsbifvandsxsrv.supabase.co'; 
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrbGV2dmJzYmlmdmFuZHN4c3J2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ3NjEyMjcsImV4cCI6MjExMDMzNzIyN30.FHoCwTPT3Q_1jr6HzWs03ShpwVMd_iDx_wMim8De7G4'; 
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        /* 2) الحفظ السحابي التلقائي والتنظيف */
         let saveTimer;
-        const flush = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch(e){} };
         window.saveDB = function() {
             db.classes.forEach(c => c.students.forEach(s => s.name = clean(s.name)));
             db.attendance.forEach(a => a.records.forEach(r => { if(r.note) r.note = clean(r.note); }));
             clearTimeout(saveTimer);
-            saveTimer = setTimeout(() => { flush(); updateDashboardStats(); }, 400);
+            saveTimer = setTimeout(async () => { 
+                try {
+                    await supabaseClient.from('app_store').upsert({ id: 'main_db', db_data: db });
+                    updateDashboardStats();
+                } catch(e) { console.error('خطأ في الحفظ السحابي', e); }
+            }, 500);
         };
-        window.addEventListener('beforeunload', flush);
         
-        window.saveAttendance = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch(e){} alert('✅ تم حفظ سجل الحضور والغياب والدرجات الشفوية يدوياً بنجاح!'); };
-        window.saveManualGrades = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch(e){} alert('✅ تم حفظ كافة التعديلات على الدرجات يدوياً بنجاح!'); };
+        window.saveAttendance = () => { saveDB(); alert('✅ تم حفظ سجل الحضور والغياب والدرجات الشفوية سحابياً بنجاح!'); };
+        window.saveManualGrades = () => { saveDB(); alert('✅ تم حفظ كافة التعديلات على الدرجات سحابياً بنجاح!'); };
 
-        /* 2) نظام التراجع (Undo) */
+        /* 3) نظام التراجع (Undo) - يتم محلياً ثم يرفع للسحابة */
         const stack = [];
         const showUndo = () => {
             const btn = $('undoBtn');
@@ -553,17 +561,16 @@
         const snap = () => { stack.push(JSON.stringify(db)); if(stack.length > 20) stack.shift(); showUndo(); };
         window.undo = () => {
             const s = stack.pop(); if(!s) return;
-            db = JSON.parse(s); flush();
+            db = JSON.parse(s); saveDB(); // الحفظ يرفع الحالة القديمة للسحابة
             renderClassesList(); populateClassSelects(); loadClassAttendance(); updateDashboardStats(); renderTrash();
             if($('gradesClassSelect').value) loadMasterGrades();
             showUndo();
         };
         window.addEventListener('keydown', e => { if((e.ctrlKey || e.metaKey) && e.key === 'z' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); undo(); } });
         
-        // دالة مساعدة لتغليف الدوال وإضافة التراجع لها
         const withSnap = fn => (...args) => { snap(); return fn(...args); };
 
-        /* 3) القفل برمز PIN */
+        /* 4) القفل برمز PIN */
         const hashPin = async p => {
             try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('mz'+p)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
             catch(e) { let h=5381; for(const ch of 'mz'+p) h=((h<<5)+h+ch.charCodeAt(0))|0; return 'x'+h; }
@@ -596,7 +603,7 @@
             }; inp.focus();
         }
 
-        /* 4) المظهر والإعدادات والتنقل */
+        /* 5) المظهر والإعدادات والتنقل */
         function toggleDarkMode() {
             const isDark = document.documentElement.classList.toggle('dark');
             localStorage.setItem('dark_mode', isDark);
@@ -634,7 +641,7 @@
             else if(t==='backup') { renderTrash(); renderPin(); }
         };
 
-        /* 5) لوحة التحكم والمؤشرات الإضافية (جدول الحصص، التحذيرات) */
+        /* 6) لوحة التحكم والمؤشرات الإضافية (جدول الحصص، التحذيرات) */
         const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'], PER = ['الحصة الأولى', 'الحصة الثانية', 'الحصة الثالثة', 'الحصة الرابعة', 'الحصة الخامسة', 'الحصة السادسة', 'الحصة السابعة'];
         let ttOpen = false;
         window.ttSet = (d, pi, cid) => { db.timetable = db.timetable.filter(t => !(t.d===d && t.p===PER[pi])); if(cid) db.timetable.push({ d, p:PER[pi], classId:cid }); saveDB(); };
@@ -677,7 +684,7 @@
             renderToday(); renderExtras();
         };
 
-        /* 6) الفصول والطلاب والمحذوفات */
+        /* 7) الفصول والطلاب والمحذوفات */
         const preClasses = ["10-1","10-2","11ع-1","11د-1","12ع-1","12د-1"];
         function populateClassSelects() {
             const sel = $('presetClassSelect'); if(sel&&sel.options.length===1) preClasses.forEach(c=>sel.innerHTML+=`<option value="${c}">${c}</option>`);
@@ -744,7 +751,7 @@
             });
         }
 
-        /* 7) الحضور وإدارة السجلات */
+        /* 8) الحضور وإدارة السجلات */
         $('attendanceDate').valueAsDate = new Date();
         function autoSelectCurrentPeriod() {
             const v = new Date().getHours()*60 + new Date().getMinutes();
@@ -799,7 +806,7 @@
         window.deleteLog = withSnap(function(date, period) { if(!confirm(`حذف سجل تاريخ ${date} - ${period} بالكامل؟`)) return; const classId = $('attendanceClassSelect').value; db.attendance = db.attendance.filter(a => !(a.classId === classId && a.date === date && a.period === period)); saveDB(); renderAttendanceLogs(); if($('attendanceDate').value === date && $('lessonPeriodSelect').value === period) loadClassAttendance(); });
         window.changeLogPeriod = withSnap(function(oldDate, oldPeriod) { const classId = $('attendanceClassSelect').value; const newDate = prompt("تعديل التاريخ (YYYY-MM-DD):", oldDate); if(!newDate) return; const periods = ['الحصة الأولى','الحصة الثانية','الحصة الثالثة','الحصة الرابعة','الحصة الخامسة','الحصة السادسة','الحصة السابعة']; let msg="اختر الحصة:\n"; periods.forEach((p,i)=>msg+=`${i+1}. ${p}\n`); const idx = prompt(msg, periods.indexOf(oldPeriod)+1); if(!idx||isNaN(idx)||idx<1||idx>7) return alert('إلغاء.'); const newPeriod = periods[idx-1]; if((newDate!==oldDate || newPeriod!==oldPeriod) && db.attendance.find(a=>a.classId===classId&&a.date===newDate&&a.period===newPeriod)) return alert('يوجد سجل بهذا الوقت مسبقاً.'); const log = db.attendance.find(a=>a.classId===classId&&a.date===oldDate&&a.period===oldPeriod); if(log){ log.date=newDate; log.period=newPeriod; saveDB(); renderAttendanceLogs(); if($('attendanceDate').value===oldDate && $('lessonPeriodSelect').value===oldPeriod) { $('attendanceDate').value=newDate; $('lessonPeriodSelect').value=newPeriod; loadClassAttendance(); } } });
 
-        /* 8) الدرجات مع التقدير والترتيب */
+        /* 9) الدرجات مع التقدير والترتيب */
         function setScore(sid, f, m, v, el, isCol) {
             let val = parseFloat(v); if(isNaN(val)) val = 0;
             const over = val > m; val = Math.min(Math.max(val, 0), m);
@@ -853,7 +860,7 @@
             decorate();
         };
 
-        /* 9) ملفات شخصية وتقارير مع رسوم بيانية */
+        /* 10) ملفات شخصية وتقارير مع رسوم بيانية */
         window.openStudentProfile = sid => {
             let st, c; db.classes.forEach(x=>{const s=x.students.find(y=>y.id===sid); if(s) {st=s; c=x;}}); if(!st) return;
             $('profileStudentName').innerText = `${st.name}`; $('profileStudentClass').innerText = c?c.name:'';
@@ -899,12 +906,12 @@
         };
         window.onReportClassChange = () => { const cid=$('reportClassSelect').value, sel=$('reportStudentSelect'); sel.innerHTML='<option value="">-- الكل --</option>'; (cid?[db.classes.find(c=>c.id===cid)]:db.classes).forEach(c=>c&&c.students.forEach(s=>sel.innerHTML+=`<option value="${s.id}">${s.name}</option>`)); generateReports(); };
 
-        /* 10) التحميل الديناميكي والطباعة والتصدير */
+        /* 11) التحميل الديناميكي للطباعة والتصدير والاستيراد */
         const LIB = { XLSX:'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', Tesseract:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js', pdfjsLib:'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', html2pdf:'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js', Chart:'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js' };
         const pending = {}; const loadScript = n => window[n]?Promise.resolve():(pending[n]||(pending[n]=new Promise((res,rej)=>{const s=document.createElement('script');s.src=LIB[n];s.onload=res;s.onerror=rej;document.head.appendChild(s);})));
         
         /* طباعة وتصدير الإكسل والـ PDF */
-        window.exportMasterGradesExcel = async () => { await loadScript('XLSX'); const t=$('#masterGradesContainer table'); if(t) XLSX.writeFile(XLSX.utils.table_to_book(t), 'Grades.xlsx'); else alert('لا توجد بيانات'); };
+        window.exportMasterGradesExcel = async () => { await loadScript('XLSX'); const container=$('masterGradesContainer'); const t=container?container.querySelector('table'):null; if(t) XLSX.writeFile(XLSX.utils.table_to_book(t), 'Grades.xlsx'); else alert('لا توجد بيانات'); };
         window.exportExcelReport = async () => { await loadScript('XLSX'); XLSX.writeFile(XLSX.utils.table_to_book($('reportPrintArea').querySelector('table')), 'Report.xlsx'); };
         window.exportPDFReport = () => window.print();
         window.exportSingleStudentPDF = async () => { await loadScript('html2pdf'); html2pdf().from($('studentProfilePrintArea')).set({margin:10,filename:'Student.pdf',html2canvas:{scale:2},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).save(); };
@@ -940,7 +947,6 @@
             win.document.close(); win.print();
         };
 
-        /* استيراد البيانات */
         window.handleExcelImport = async e => { await loadScript('XLSX'); const f=e.target.files[0], cid=$('importTargetClass').value; if(!f||!cid) return; const r=new FileReader(); r.onload=x=>{const rows=XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(x.target.result),{type:'array'}).Sheets[XLSX.read(new Uint8Array(x.target.result),{type:'array'}).SheetNames[0]],{header:1}), c=db.classes.find(y=>y.id===cid); rows.forEach(row=>{if(row[0]) c.students.push({id:'std_'+Math.random().toString(36).substr(2,9), civilId:row[1]?String(row[1]):'', name:row[2]?String(row[2]):String(row[0])});}); saveDB(); renderClassesList(); alert('تم الاستيراد');}; r.readAsArrayBuffer(f); };
         window.handleImageOCR = async e => { await loadScript('Tesseract'); const f=e.target.files[0], cid=$('importTargetClass').value; if(!f||!cid) return; $('importStatus').innerText='جاري القراءة...'; Tesseract.recognize(f,'ara+eng').then(res=>{const c=db.classes.find(y=>y.id===cid); res.data.text.split('\n').forEach(l=>{if(l.trim().length>5) c.students.push({id:'std_'+Math.random().toString(36).substr(2,9),name:l.trim()});}); saveDB(); renderClassesList(); $('importStatus').innerText='نجاح';}).catch(()=>$('importStatus').innerText='فشل'); };
         window.handlePDFMultiImport = async e => {
@@ -948,7 +954,7 @@
             const r=new FileReader(); r.onload=async function(){ try{ const pdf=await pdfjsLib.getDocument(new Uint8Array(this.result)).promise; let ex=0, cc=0; for(let i=1;i<=pdf.numPages;i++){const txt=await (await pdf.getPage(i)).getTextContent(), items=txt.items.map(x=>x.str.trim()).filter(Boolean), fT=items.join(' '); let pre="11ع", sec=i; if(fT.includes("عاشر"))pre="10"; else if(fT.includes("أدبي"))pre=fT.includes("ثاني")?"12د":"11د"; else if(fT.includes("علمي"))pre=fT.includes("ثاني")?"12ع":"11ع"; items.forEach((it,idx)=>{if(it.includes("قائمة")&&/^\d+$/.test(items[idx+1])) sec=items[idx+1];}); let cN=targetId?(db.classes.find(c=>c.id===targetId)||{}).name:`${pre}-${sec}`, c=db.classes.find(x=>x.name===cN); if(!c){c={id:'cls_'+Date.now()+i,name:cN,students:[],teachers:[],oralMax:10,projectMax:7,examMax:15,customColumns:[]};db.classes.push(c);cc++;} items.forEach((it,idx)=>{if(/^\d{12}$/.test(it)){let nm="", gn="ذكر"; for(let k=Math.max(0,idx-4);k<=Math.min(items.length-1,idx+4);k++){const cd=items[k]; if(cd.length>5&&!/^\d+$/.test(cd)&&!cd.includes('وزارة')) nm=cd; if(cd==='أنثى') gn='أنثى';} if(nm&&!c.students.some(s=>s.name===nm)){c.students.push({id:'std_'+Math.random().toString(36).substr(2,9),name:nm,civilId:it,gender:gn});ex++;} }}); } saveDB(); renderClassesList(); populateClassSelects(); $('importStatus').innerText=`تم استيراد ${ex} طالب في ${cc||1} فصول.`; }catch(e){$('importStatus').innerText='خطأ بالتحليل.';} }; r.readAsArrayBuffer(f);
         };
 
-        /* 11) البحث السريع للطلاب (مع توحيد الحروف العربية) */
+        /* 12) البحث السريع للطلاب (مع توحيد الحروف العربية) */
         window.handleGlobalSearch = function(query) {
             const container = $('globalSearchResults'); container.innerHTML = ''; const q = query.trim().toLowerCase(); if(!q) return;
             const normalizeArabic = (text) => text.replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[\u064B-\u065F]/g, '');
@@ -964,13 +970,29 @@
             container.innerHTML = results.length ? results.join('') : `<div class="col-span-full text-center text-gray-400 text-xs py-2">لا توجد نتائج مطابقة لـ "${esc(query)}"</div>`;
         };
 
-        /* التهيئة عند البدء */
-        applySettings();
-        populateClassSelects();
-        renderClassesList();
-        updateDashboardStats();
-        lockScreen();
-        showUndo();
+        /* 13) التهيئة السحابية عند بدء التطبيق */
+        async function initCloudDB() {
+            try {
+                const { data, error } = await supabaseClient.from('app_store').select('db_data').eq('id', 'main_db').single();
+                if (data && data.db_data) {
+                    db = data.db_data;
+                    if(!db.grades) db.grades = {}; if(!db.trash) db.trash = []; if(!db.timetable) db.timetable = [];
+                    if(!db.settings) db.settings = { schoolName: 'ثانوية بلاط الشهداء للبنين', district: 'الإدارة العامة لمنطقة الأحمدي التعليمية', academicYear: '2027/2026', logo: '' };
+                }
+            } catch (e) {
+                console.log("قاعدة البيانات جديدة أو يوجد خطأ في الاتصال", e);
+            }
+            
+            applySettings();
+            populateClassSelects();
+            renderClassesList();
+            updateDashboardStats();
+            lockScreen();
+            showUndo();
+        }
+
+        // تشغيل التهيئة
+        initCloudDB();
     </script>
 </body>
 </html>
